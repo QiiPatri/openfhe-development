@@ -137,9 +137,9 @@ int main() {
 
     c1 = cc->Rescale(c1);
 
-    std::cout << "Ctxt data after Rescaling: " << std::endl;
-    std::cout << "ctxt0: " << c1->GetElements()[0] << std::endl;
-    std::cout << "ctxt1: " << c1->GetElements()[1] << std::endl;
+    // std::cout << "Ctxt data after Rescaling: " << std::endl;
+    // std::cout << "ctxt0: " << c1->GetElements()[0] << std::endl;
+    // std::cout << "ctxt1: " << c1->GetElements()[1] << std::endl;
 
     // Step 5: Decryption and output
     Plaintext result;
