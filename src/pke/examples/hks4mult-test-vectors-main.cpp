@@ -43,8 +43,8 @@ using namespace lbcrypto;
 
 int main() {
     uint32_t multDepth    = 8;
-    uint32_t scaleModSize = 10;
-    usint firstModSize    = 10;
+    uint32_t scaleModSize = 12;
+    usint firstModSize    = 12;
     uint32_t batchSize    = 4;
     uint32_t ringDim      = 2 * batchSize;
 
@@ -123,10 +123,21 @@ int main() {
     // 2.  Hybrid Key Switching (HKS) to correct the resulting ciphertext structure.
     // Note: OpenFHE internally reverses this order, performing HKS-related mixing before rotation.
     //      This pre-mixing ensures the subsequent rotation's internal mixing cancels the initial adjustment.
-    c1 = cc->EvalMult(c1, c2);
+    c1 = cc->EvalMultNoRelin(c1, c2);
+    std::cout << "Ctxt data after Multiplication (No Relinearize): " << std::endl;
+    std::cout << "ctxt0: " << c1->GetElements()[0] << std::endl;
+    std::cout << "ctxt1: " << c1->GetElements()[1] << std::endl;
+    std::cout << "ctxt2: " << c1->GetElements()[2] << std::endl;
+
+    c1 = cc->Relinearize(c1);
+
+    std::cout << "Ctxt data after Relinearization: " << std::endl;
+    std::cout << "ctxt0: " << c1->GetElements()[0] << std::endl;
+    std::cout << "ctxt1: " << c1->GetElements()[1] << std::endl;
+
     c1 = cc->Rescale(c1);
 
-    std::cout << "Ctxt data after Rotation: " << std::endl;
+    std::cout << "Ctxt data after Rescaling: " << std::endl;
     std::cout << "ctxt0: " << c1->GetElements()[0] << std::endl;
     std::cout << "ctxt1: " << c1->GetElements()[1] << std::endl;
 
