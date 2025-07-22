@@ -64,7 +64,7 @@ void validateParametersForCryptocontext(const Params& parameters) {
             }
         }
         else {
-            if (MAX_MODULUS_SIZE <= parameters.GetScalingModSize() || 15 > parameters.GetScalingModSize()) {
+            if (parameters.GetScalingModSize() >= MAX_MODULUS_SIZE || parameters.GetScalingModSize() < 15) {
                 OPENFHE_THROW(
                     "scalingModSize should be greater than 15 and less than " + std::to_string(MAX_MODULUS_SIZE));
             }
@@ -82,7 +82,10 @@ void validateParametersForCryptocontext(const Params& parameters) {
         if (parameters.GetExecutionMode() == EXEC_NOISE_ESTIMATION && parameters.GetCKKSDataType() == COMPLEX) {
             OPENFHE_THROW("EXEC_NOISE_ESTIMATION mode is not compatible with complex data types.");
         }
-        if (parameters.GetFirstModSize() < parameters.GetScalingModSize()) {
+        if (parameters.GetFirstModSize() >= MAX_MODULUS_SIZE) {
+            OPENFHE_THROW("firstModSize should be less than " + std::to_string(MAX_MODULUS_SIZE));
+        }
+        if (parameters.GetScalingModSize() > parameters.GetFirstModSize()) {
             OPENFHE_THROW("firstModSize cannot be less than scalingModSize");
         }
     }
@@ -92,6 +95,13 @@ void validateParametersForCryptocontext(const Params& parameters) {
         }
         if (NOISE_FLOODING_HRA == parameters.GetPREMode()) {
             OPENFHE_THROW("NOISE_FLOODING_HRA is not supported in BFVRNS");
+        }
+        if (parameters.GetScalingModSize() >= MAX_MODULUS_SIZE || parameters.GetScalingModSize() < 15) {
+            OPENFHE_THROW("scalingModSize should be greater than 15 and less than " + std::to_string(MAX_MODULUS_SIZE));
+        }
+        // if (MAX_MODULUS_SIZE <= parameters.GetFirstModSize()) {
+        if (parameters.GetFirstModSize() >= MAX_MODULUS_SIZE) {
+            OPENFHE_THROW("firstModSize should be less than " + std::to_string(MAX_MODULUS_SIZE));
         }
     }
     else if (isBGVRNS(scheme)) {
@@ -125,10 +135,17 @@ void validateParametersForCryptocontext(const Params& parameters) {
             if (FIXEDMANUAL != parameters.GetScalingTechnique()) {
                 OPENFHE_THROW("firstModSize is allowed for scalingTechnique == FIXEDMANUAL only");
             }
+            else if (parameters.GetFirstModSize() >= MAX_MODULUS_SIZE) {
+                OPENFHE_THROW("firstModSize should be less than " + std::to_string(MAX_MODULUS_SIZE));
+            }
         }
         if (0 != parameters.GetScalingModSize()) {
             if (FIXEDMANUAL != parameters.GetScalingTechnique()) {
                 OPENFHE_THROW("scalingModSize is allowed for scalingTechnique == FIXEDMANUAL only");
+            }
+            else if (parameters.GetScalingModSize() >= MAX_MODULUS_SIZE || parameters.GetScalingModSize() < 15) {
+                OPENFHE_THROW("scalingModSize should be greater than 15 and less than " +
+                              std::to_string(MAX_MODULUS_SIZE));
             }
         }
         if (0 != parameters.GetPRENumHops()) {
@@ -161,7 +178,7 @@ void validateParametersForCryptocontext(const Params& parameters) {
     }
     if (BV == parameters.GetKeySwitchTechnique()) {
         const uint32_t maxDigitSize = uint32_t(std::ceil(MAX_MODULUS_SIZE / 2));
-        if (maxDigitSize < parameters.GetDigitSize()) {
+        if (parameters.GetDigitSize() > maxDigitSize) {
             OPENFHE_THROW("digitSize should not be greater than " + std::to_string(maxDigitSize) +
                           " for keySwitchTechnique == BV");
         }

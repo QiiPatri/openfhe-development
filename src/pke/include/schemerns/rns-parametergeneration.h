@@ -68,11 +68,17 @@ public:
     }
 
 protected:
+#if defined(HAVE_INT128)
+    #define DCRT_MAX_SIZE_INTERNAL 60
+#else
+    #define DCRT_MAX_SIZE_INTERNAL MAX_MODULUS_SIZE
+#endif
     enum DCRT_MODULUS {
         DEFAULT_EXTRA_MOD_SIZE = 20,
         MIN_SIZE               = 14,
-        MAX_SIZE               = 60,
+        MAX_SIZE               = DCRT_MAX_SIZE_INTERNAL
     };
+#undef DCRT_MAX_SIZE_INTERNAL
 };
 
 }  // namespace lbcrypto

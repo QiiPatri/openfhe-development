@@ -50,6 +50,12 @@ endif()
 
 message(STATUS "Building in ${CMAKE_BUILD_TYPE} mode")
 
+# SET_HAVE_INT128_FALSE was added to support CI for rare corner cases, to test the library for platforms
+# where uint64_t is available (almost always), but __int128 is not supported.
+# Examples include Emscripten, 32-bit architectures, etc.
+# DO NOT USE this flag unless it is specifically for CI testing.
+option(SET_HAVE_INT128_FALSE "Special test option to set HAVE_INT128 to FALSE" OFF )
+
 if (EMSCRIPTEN)
     set(BUILD_SHARED OFF)
     message("Shared library is not supported by Emscripten")
@@ -297,14 +303,17 @@ if("${NATIVE_SIZE}" EQUAL 128)
         message(SEND_ERROR "Cannot support NATIVE_SIZE == 128")
     endif()
 elseif("${NATIVE_SIZE}" EQUAL 64)
-#    if(EMSCRIPTEN)
-#        set(HAVE_INT128 FALSE)
-#    endif()
     if(${HAVE_INT64})
         set(NATIVEINT 64)
         message(STATUS "NATIVEINT is set to " ${NATIVEINT})
     else()
         message(SEND_ERROR "Cannot support NATIVE_SIZE == 64")
+    endif()
+#    if(EMSCRIPTEN)
+    if(SET_HAVE_INT128_FALSE)
+        message(WARNING "SET_HAVE_INT128_FALSE is enabled. This should only be used for CI or test scenarios.")
+        set(HAVE_INT128 FALSE)
+        message(STATUS "HAVE_INT128 is set to " ${HAVE_INT128})
     endif()
 elseif("${NATIVE_SIZE}" EQUAL 32)
     if(${HAVE_INT64})

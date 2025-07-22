@@ -46,14 +46,14 @@ CKKS implementation. See https://eprint.iacr.org/2020/1118 for details.
 #include <iostream>
 
 namespace lbcrypto {
-
-#if NATIVEINT == 128
-const size_t AUXMODSIZE = 119;
-#elif NATIVEINT == 32
-const size_t AUXMODSIZE = 28;
-#else
-const size_t AUXMODSIZE = 60;
-#endif
+namespace {
+    inline constexpr uint32_t AUXMODSIZE = 
+    #if defined(HAVE_INT128)
+        119;
+    #else
+        MAX_MODULUS_SIZE;
+    #endif
+}
 
 bool ParameterGenerationCKKSRNS::ParamsGenCKKSRNSInternal(std::shared_ptr<CryptoParametersBase<DCRTPoly>> cryptoParams,
                                                           uint32_t cyclOrder, uint32_t numPrimes, uint32_t scalingModSize,
