@@ -1,3 +1,13 @@
+08/18/2025: OpenFHE 1.4.0 (development) is released
+
+* Adds general functional bootstrapping using CKKS proposed in https://eprint.iacr.org/2024/1623 (#954)
+* Enables the sparse-secret encapsulation mode from https://eprint.iacr.org/2022/024 for regular and functional CKKS bootstrapping (#1001)
+* Adds optimized implementation (without checks) for selected homomorphic addition and multiplication operations (#991)
+* Updates google submodules (#1036)
+* Fixes several bugs
+
+The detailed list of changes is available at https://github.com/openfheorg/openfhe-development/issues?q=is%3Aissue+milestone%3A%22Release+1.4.0%22
+
 07/11/2025: OpenFHE 1.3.1 (stable) is released
 
 * Updates the noise estimation models for BGV and BFV, making them slightly more conservative (roughly 1 extra bit is added for each multiplicative level) (#1004)
