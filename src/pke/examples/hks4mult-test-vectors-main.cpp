@@ -43,10 +43,11 @@ using namespace lbcrypto;
 
 int main() {
     uint32_t multDepth    = 8;
-    uint32_t scaleModSize = 12;
-    usint firstModSize    = 12;
-    uint32_t batchSize    = 4;
+    uint32_t scaleModSize = 50;
+    uint32_t firstModSize = 60;
+    uint32_t batchSize    = 32;
     uint32_t ringDim      = 2 * batchSize;
+    uint32_t dnum         = 3;
 
     CCParams<CryptoContextCKKSRNS> parameters;
     parameters.SetSecurityLevel(HEStd_NotSet);
@@ -55,7 +56,6 @@ int main() {
     parameters.SetScalingModSize(scaleModSize);
     parameters.SetBatchSize(batchSize);
     parameters.SetRingDim(ringDim);
-    usint dnum = 3;
     parameters.SetScalingTechnique(FIXEDMANUAL);
     parameters.SetKeySwitchTechnique(KeySwitchTechnique::HYBRID);
     parameters.SetNumLargeDigits(dnum);  //
@@ -105,7 +105,7 @@ int main() {
     // Encrypt the encoded vectors
     auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
     auto c2 = cc->Encrypt(keys.publicKey, ptxt2);
-    
+
     std::cout << "\n\n\n<<<<<>>>>> Evaluation logic starts here\n\n\n";
 
     std::cout << "ctxt levels after fresh enc: " << c1->GetLevel() << std::endl;
@@ -134,6 +134,7 @@ int main() {
     std::cout << "Ctxt data after Relinearization: " << std::endl;
     std::cout << "ctxt0: " << c1->GetElements()[0] << std::endl;
     std::cout << "ctxt1: " << c1->GetElements()[1] << std::endl;
+    std::cout << "END Relinearization\n";
 
     c1 = cc->Rescale(c1);
 
