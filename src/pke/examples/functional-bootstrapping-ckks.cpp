@@ -45,13 +45,14 @@ const BigInteger QBFVINIT(BigInteger(1) << 60);
 const BigInteger QBFVINITLARGE(BigInteger(1) << 80);
 
 void ArbitraryLUTRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
-                  uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
-                  std::function<int64_t(int64_t)> func);
-void MultiValueBootstrappingRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
-                             uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
-                             uint32_t levelComputation);
+                      uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
+                      std::function<int64_t(int64_t)> func);
+void MultiValueBootstrappingRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q,
+                                 BigInteger Bigq, uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
+                                 uint32_t levelComputation);
 void MultiPrecisionSignRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger PDigit, BigInteger Q, BigInteger Bigq,
-                        uint32_t scaleTHI, uint32_t scaleStepTHI, size_t order, uint32_t numSlots, uint32_t ringDim);
+                            uint32_t scaleTHI, uint32_t scaleStepTHI, size_t order, uint32_t numSlots,
+                            uint32_t ringDim);
 
 int main() {
     // std::cerr << "\n*1.* Compute the function (x % PInput - POutput / 2) % POutput." << std::endl << std::endl;
@@ -96,14 +97,16 @@ int main() {
     /*====Discrete CKKS Functional Bootstrapping====*/
 
     /* Function */
-    BigInteger PInput(128); // Andreea: type on integer instead of big integer for CKKS only?
-    BigInteger POutput(128);
+    BigInteger PInput(256);  // Andreea: type on integer instead of big integer for CKKS only?
+    BigInteger POutput(2);
+    uint32_t dcrtBits = 50;
+    BigInteger Bigq(1UL << dcrtBits);
     uint32_t order = 1;
     // scaleTHI HAS to be 1 for PInput = 2. Andreea: hardcode this.
-    double scaleTHI = 16.; 
+    double scaleTHI = 1;  // 16.;
 
-    auto a     = PInput.ConvertToInt<int64_t>();
-    auto b     = POutput.ConvertToInt<int64_t>();
+    auto a    = PInput.ConvertToInt<int64_t>();
+    auto b    = POutput.ConvertToInt<int64_t>();
     auto func = [a, b](int64_t x) -> int64_t {
         return (x % a) % b;
     };
@@ -122,15 +125,15 @@ int main() {
         coeffcomp = GetHermiteTrigCoefficients(func, a, order, scaleTHI);  // divided by 2
     }
 
-    uint32_t ringDim = 16;
-    uint32_t numSlots = 8;
-    uint32_t dcrtBits                       = 50;
-    uint32_t firstMod                       = 55;
-    uint32_t dnum                           = 3;
-    SecretKeyDist secretKeyDist             = SPARSE_ENCAPSULATED;
-    std::vector<uint32_t> lvlb              = {3, 3}; // Andreea: note the different order in the lvlb, we do first StC but it is on position [1]
-    // uint32_t levelsAvailableBeforeBootstrap = 0; // Andreea: these should be at least lvlb[1] + 1, and we need to reduce them
-    uint32_t levelsAvailableAfterBootstrap  = 1; // 0; // Andreea: we need at least 1 level after bootstrap to be able to correctly decrypt for large messages
+    uint32_t ringDim            = 32;
+    uint32_t numSlots           = 16;
+    uint32_t firstMod           = 50;
+    uint32_t dnum               = 3;
+    SecretKeyDist secretKeyDist = SPARSE_ENCAPSULATED;
+    std::vector<uint32_t> lvlb  = {
+        3, 3};  // Andreea: note the different order in the lvlb, we do first StC but it is on position [1]
+    // We need at least 1 level after bootstrap to be able to correctly decrypt for non-boolean messages, and more levels if we want to support subsequent FBTs
+    uint32_t levelsAvailableAfterBootstrap = 1;  //  std::min(static_cast<uint32_t>(1), lvlb[1] + 1);
 
     CCParams<CryptoContextCKKSRNS> parameters;
     parameters.SetSecretKeyDist(secretKeyDist);
@@ -141,12 +144,14 @@ int main() {
     parameters.SetNumLargeDigits(dnum);
     parameters.SetBatchSize(numSlots);
     parameters.SetRingDim(ringDim);
-    uint32_t depth = levelsAvailableAfterBootstrap + lvlb[0] + 1 + lvlb[1] + 1; // Andreea: Remove lvlb[1] + 1 when StC is done before mod raise
+    uint32_t depth = levelsAvailableAfterBootstrap + lvlb[0] + 2;
 
     if (binaryLUT)
         depth += FHECKKSRNS::AdjustDepthFBT(coeffint, PInput, order, secretKeyDist);
     else
         depth += FHECKKSRNS::AdjustDepthFBT(coeffcomp, PInput, order, secretKeyDist);
+
+    // Andreea: We should get this from a function GetFBTBootstrapDepth; that 2 comes from the double-angle formula
 
     parameters.SetMultiplicativeDepth(depth);
 
@@ -167,10 +172,10 @@ int main() {
     auto keyPair = cc->KeyGen();
 
     if (binaryLUT)
-        cc->EvalFBTSetup(coeffint, numSlots, PInput, POutput, 1UL, keyPair.publicKey, {0, 0}, lvlb,
+        cc->EvalFBTSetup(coeffint, numSlots, PInput, POutput, Bigq, keyPair.publicKey, {0, 0}, lvlb,
                          levelsAvailableAfterBootstrap, 0, order, true);
     else
-        cc->EvalFBTSetup(coeffcomp, numSlots, PInput, POutput, 1UL, keyPair.publicKey, {0, 0}, lvlb,
+        cc->EvalFBTSetup(coeffcomp, numSlots, PInput, POutput, Bigq, keyPair.publicKey, {0, 0}, lvlb,
                          levelsAvailableAfterBootstrap, 0, order, true);
 
     cc->EvalBootstrapKeyGen(keyPair.secretKey, numSlots);
@@ -183,7 +188,8 @@ int main() {
     if (x.size() < numSlots)
         x = Fill<double>(x, numSlots);
 
-    auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, 0, nullptr, numSlots);
+    auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, 0, nullptr, numSlots);  // Andreea: reduce levels before HomDecoding
+    // auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, depth - lvlb[1], nullptr, numSlots); // -1 for correction in AdjustCiphertext
     auto ctxt = cc->Encrypt(keyPair.publicKey, ptxt);
 
     std::cerr << "#levels of ctxt: " << ctxt->GetLevel() << ", depth = " << ctxt->GetNoiseScaleDeg() << std::endl;
@@ -192,11 +198,14 @@ int main() {
     */
     Ciphertext<DCRTPoly> ctxtAfterFBT;
     if (binaryLUT)
-        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffint, PInput.GetMSB() - 1, ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
+        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffint, PInput.GetMSB() - 1,
+                                   ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
     else
-        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffcomp, PInput.GetMSB() - 1, ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
+        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffcomp, PInput.GetMSB() - 1,
+                                   ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
 
-    std::cerr << "#levels of ctxtAfterFBT: " << ctxtAfterFBT->GetLevel() << ", depth = " << ctxtAfterFBT->GetNoiseScaleDeg() << std::endl;
+    std::cerr << "#levels of ctxtAfterFBT: " << ctxtAfterFBT->GetLevel()
+              << ", depth = " << ctxtAfterFBT->GetNoiseScaleDeg() << std::endl;
 
     Plaintext result;
     cc->Decrypt(keyPair.secretKey, ctxtAfterFBT, &result);
@@ -204,9 +213,8 @@ int main() {
     std::cerr << "Result after FBT: " << result << std::endl;
 
     auto exact(x);
-    std::transform(x.begin(), x.end(), exact.begin(), [&](const double& elem) {
-        return func(static_cast<int64_t>(elem));
-    });
+    std::transform(x.begin(), x.end(), exact.begin(),
+                   [&](const double& elem) { return func(static_cast<int64_t>(elem)); });
 
     // std::transform(x.begin(), x.end(), exact.begin(), [&](const double& elem) {
     //     return (func(static_cast<int64_t>(elem)) > POutput.ConvertToDouble() / 2.) ? func(static_cast<int64_t>(elem)) - POutput.ConvertToDouble() : func(static_cast<int64_t>(elem));
@@ -219,8 +227,7 @@ int main() {
     // std::transform(exact.begin(), exact.end(), exact.begin(),
     //                [&](const int64_t& elem) { return (std::abs(elem)) % (POutput.ConvertToInt()); });
 
-    std::transform(exact.begin(), exact.end(), exact.begin(),
-                   [&](const int64_t& elem) { return std::abs(elem); });
+    std::transform(exact.begin(), exact.end(), exact.begin(), [&](const int64_t& elem) { return std::abs(elem); });
 
     // std::cerr << "absolute error: " << exact << std::endl;
 
@@ -231,8 +238,8 @@ int main() {
 }
 
 void ArbitraryLUTRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
-                  uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
-                  std::function<int64_t(int64_t)> func) {
+                      uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
+                      std::function<int64_t(int64_t)> func) {
     /* 1. Figure out whether sparse packing or full packing should be used.
      * numSlots represents the number of values to be encrypted in BFV.
      * If this number is the same as the ring dimension, then the CKKS slots is half.
@@ -376,9 +383,9 @@ void ArbitraryLUTRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput
     std::cerr << "Max absolute error obtained: " << *max_error_it << std::endl << std::endl;
 }
 
-void MultiValueBootstrappingRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
-                             uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
-                             uint32_t levelsComputation) {
+void MultiValueBootstrappingRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q,
+                                 BigInteger Bigq, uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
+                                 uint32_t levelsComputation) {
     /* 1. Figure out whether sparse packing or full packing should be used.
      * numSlots represents the number of values to be encrypted in BFV.
      * If this number is the same as the ring dimension, then the CKKS slots is half.
@@ -615,7 +622,8 @@ void MultiValueBootstrappingRLWE(BigInteger QBFVInit, BigInteger PInput, BigInte
 }
 
 void MultiPrecisionSignRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger PDigit, BigInteger Q, BigInteger Bigq,
-                        uint32_t scaleTHI, uint32_t scaleStepTHI, size_t order, uint32_t numSlots, uint32_t ringDim) {
+                            uint32_t scaleTHI, uint32_t scaleStepTHI, size_t order, uint32_t numSlots,
+                            uint32_t ringDim) {
     /* 1. Figure out whether sparse packing or full packing should be used.
      * numSlots represents the number of values to be encrypted in BFV.
      * If this number is the same as the ring dimension, then the CKKS slots is half.
