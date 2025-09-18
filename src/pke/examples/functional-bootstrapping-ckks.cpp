@@ -44,59 +44,193 @@ using namespace lbcrypto;
 const BigInteger QBFVINIT(BigInteger(1) << 60);
 const BigInteger QBFVINITLARGE(BigInteger(1) << 80);
 
-void ArbitraryLUT(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
+void ArbitraryLUTRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
                   uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
                   std::function<int64_t(int64_t)> func);
-void MultiValueBootstrapping(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
+void MultiValueBootstrappingRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
                              uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
                              uint32_t levelComputation);
-void MultiPrecisionSign(BigInteger QBFVInit, BigInteger PInput, BigInteger PDigit, BigInteger Q, BigInteger Bigq,
+void MultiPrecisionSignRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger PDigit, BigInteger Q, BigInteger Bigq,
                         uint32_t scaleTHI, uint32_t scaleStepTHI, size_t order, uint32_t numSlots, uint32_t ringDim);
 
 int main() {
-    std::cerr << "\n*1.* Compute the function (x % PInput - POutput / 2) % POutput." << std::endl << std::endl;
-    // Boolean LUT
-    std::cerr << "=====Boolean LUT order 1 sparsely packed=====" << std::endl << std::endl;
-    ArbitraryLUT(QBFVINIT, BigInteger(2), BigInteger(2), (BigInteger(1) << 33), (BigInteger(1) << 33), 1, 1, 8, 4096,
-                 [](int64_t x) { return (x % 2 - 2 / 2) % 2; });
-    std::cerr << "=====Boolean LUT order 2 sparsely packed=====" << std::endl << std::endl;
-    ArbitraryLUT(QBFVINIT, BigInteger(2), BigInteger(2), (BigInteger(1) << 33), (BigInteger(1) << 33), 1, 2, 8, 4096,
-                 [](int64_t x) { return (x % 2 - 2 / 2) % 2; });
-    std::cerr << "=====Boolean LUT order 1 fully packed=====" << std::endl << std::endl;
-    ArbitraryLUT(QBFVINIT, BigInteger(2), BigInteger(2), (BigInteger(1) << 33), (BigInteger(1) << 33), 1, 1, 1024, 4096,
-                 [](int64_t x) { return (x % 2 - 2 / 2) % 2; });
-    // LUT with 8-bit input and 4-bit output
-    std::cerr << "=====8-to-4 bit LUT order 1 sparsely packed=====" << std::endl << std::endl;
-    ArbitraryLUT(QBFVINIT, BigInteger(256), BigInteger(16), (BigInteger(1) << 47), (BigInteger(1) << 47), 32, 1, 8,
-                 4096, [](int64_t x) { return (x % 256 - 16 / 2) % 16; });
+    // std::cerr << "\n*1.* Compute the function (x % PInput - POutput / 2) % POutput." << std::endl << std::endl;
+    // // Boolean LUT
+    // std::cerr << "=====Boolean LUT order 1 sparsely packed=====" << std::endl << std::endl;
+    // ArbitraryLUTRLWE(QBFVINIT, BigInteger(2), BigInteger(2), (BigInteger(1) << 33), (BigInteger(1) << 33), 1, 1, 8, 4096,
+    //              [](int64_t x) { return (x % 2 - 2 / 2) % 2; });
+    // std::cerr << "=====Boolean LUT order 2 sparsely packed=====" << std::endl << std::endl;
+    // ArbitraryLUTRLWE(QBFVINIT, BigInteger(2), BigInteger(2), (BigInteger(1) << 33), (BigInteger(1) << 33), 1, 2, 8, 4096,
+    //              [](int64_t x) { return (x % 2 - 2 / 2) % 2; });
+    // std::cerr << "=====Boolean LUT order 1 fully packed=====" << std::endl << std::endl;
+    // ArbitraryLUTRLWE(QBFVINIT, BigInteger(2), BigInteger(2), (BigInteger(1) << 33), (BigInteger(1) << 33), 1, 1, 1024, 4096,
+    //              [](int64_t x) { return (x % 2 - 2 / 2) % 2; });
+    // // LUT with 8-bit input and 4-bit output
+    // std::cerr << "=====8-to-4 bit LUT order 1 sparsely packed=====" << std::endl << std::endl;
+    // ArbitraryLUTRLWE(QBFVINIT, BigInteger(256), BigInteger(16), (BigInteger(1) << 47), (BigInteger(1) << 47), 32, 1, 8,
+    //              4096, [](int64_t x) { return (x % 256 - 16 / 2) % 16; });
 
-    std::cerr << "\n\n*2.* Compute multiple functions over the same ciphertext." << std::endl << std::endl;
-    // Two LUTs with 8-bit input and 8-bit output and intermediate leveled computations
-    std::cerr << "=====Multivalue bootstrapping for two 8-to-8 bit LUTs order 1 fully packed=====" << std::endl
-              << std::endl;
-    MultiValueBootstrapping(QBFVINIT, BigInteger(256), BigInteger(256), (BigInteger(1) << 47), (BigInteger(1) << 47),
-                            32, 1, 256, 2048, 1);
+    // std::cerr << "\n\n*2.* Compute multiple functions over the same ciphertext." << std::endl << std::endl;
+    // // Two LUTs with 8-bit input and 8-bit output and intermediate leveled computations
+    // std::cerr << "=====Multivalue bootstrapping for two 8-to-8 bit LUTs order 1 fully packed=====" << std::endl
+    //           << std::endl;
+    // MultiValueBootstrappingRLWE(QBFVINIT, BigInteger(256), BigInteger(256), (BigInteger(1) << 47), (BigInteger(1) << 47),
+    //                         32, 1, 256, 2048, 1);
 
-    std::cerr << "\n\n*3.* Homomorphically evaluate the sign." << std::endl << std::endl;
-    // Compute the sign of a 12-bit input using 1-bit and 4-bit digits
-    // The following needs to hold true: log2(PInput) - log2(PDigit) = log2(Q) - log2(Bigq)
-    std::cerr << "=====Sign evaluation of a 12-bit input using 1-bit digits order 1 sparsely packed=====" << std::endl
+    // std::cerr << "\n\n*3.* Homomorphically evaluate the sign." << std::endl << std::endl;
+    // // Compute the sign of a 12-bit input using 1-bit and 4-bit digits
+    // // The following needs to hold true: log2(PInput) - log2(PDigit) = log2(Q) - log2(Bigq)
+    // std::cerr << "=====Sign evaluation of a 12-bit input using 1-bit digits order 1 sparsely packed=====" << std::endl
+    //           << std::endl;
+    // MultiPrecisionSignRLWE(QBFVINIT, BigInteger(4096), BigInteger(2), (BigInteger(1) << 46), (BigInteger(1) << 35), 1, 1, 1,
+    //                    32, 2048);
+    // std::cerr << "=====Sign evaluation of a 12-bit input using 4-bit digits order 1 fully packed=====" << std::endl
+    //           << std::endl;
+    // MultiPrecisionSignRLWE(QBFVINIT, BigInteger(4096), BigInteger(16), (BigInteger(1) << 48), (BigInteger(1) << 40), 32, 8,
+    //                    1, 64, 2048);
+    // std::cerr << "=====Sign evaluation of a 32-bit input using 8-bit digits order 1 fully packed=====" << std::endl
+    //           << std::endl;
+    // MultiPrecisionSignRLWE(QBFVINITLARGE, BigInteger(1) << 32, BigInteger(256), BigInteger(1) << 71, BigInteger(1) << 47,
+    //                    256, 32, 1, 64, 2048);
+
+    /*====Discrete CKKS Functional Bootstrapping====*/
+
+    /* Function */
+    BigInteger PInput(128); // Andreea: type on integer instead of big integer for CKKS only?
+    BigInteger POutput(128);
+    uint32_t order = 1;
+    // scaleTHI HAS to be 1 for PInput = 2. Andreea: hardcode this.
+    double scaleTHI = 16.; 
+
+    auto a     = PInput.ConvertToInt<int64_t>();
+    auto b     = POutput.ConvertToInt<int64_t>();
+    auto func = [a, b](int64_t x) -> int64_t {
+        return (x % a) % b;
+    };
+
+    std::vector<int64_t> coeffint;
+    std::vector<std::complex<double>> coeffcomp;
+    bool binaryLUT = (a == 2) && (order == 1);
+
+    if (binaryLUT) {
+        coeffint = {
+            func(1),
+            func(0) -
+                func(1)};  // those are coefficients for [1, cos^2(pi x)], not [1, cos(2pi x)] as in the general case.
+    }
+    else {
+        coeffcomp = GetHermiteTrigCoefficients(func, a, order, scaleTHI);  // divided by 2
+    }
+
+    uint32_t ringDim = 16;
+    uint32_t numSlots = 8;
+    uint32_t dcrtBits                       = 50;
+    uint32_t firstMod                       = 55;
+    uint32_t dnum                           = 3;
+    SecretKeyDist secretKeyDist             = SPARSE_ENCAPSULATED;
+    std::vector<uint32_t> lvlb              = {3, 3}; // Andreea: note the different order in the lvlb, we do first StC but it is on position [1]
+    // uint32_t levelsAvailableBeforeBootstrap = 0; // Andreea: these should be at least lvlb[1] + 1, and we need to reduce them
+    uint32_t levelsAvailableAfterBootstrap  = 1; // 0; // Andreea: we need at least 1 level after bootstrap to be able to correctly decrypt for large messages
+
+    CCParams<CryptoContextCKKSRNS> parameters;
+    parameters.SetSecretKeyDist(secretKeyDist);
+    parameters.SetSecurityLevel(HEStd_NotSet);
+    parameters.SetScalingModSize(dcrtBits);
+    parameters.SetScalingTechnique(FIXEDMANUAL);
+    parameters.SetFirstModSize(firstMod);
+    parameters.SetNumLargeDigits(dnum);
+    parameters.SetBatchSize(numSlots);
+    parameters.SetRingDim(ringDim);
+    uint32_t depth = levelsAvailableAfterBootstrap + lvlb[0] + 1 + lvlb[1] + 1; // Andreea: Remove lvlb[1] + 1 when StC is done before mod raise
+
+    if (binaryLUT)
+        depth += FHECKKSRNS::AdjustDepthFBT(coeffint, PInput, order, secretKeyDist);
+    else
+        depth += FHECKKSRNS::AdjustDepthFBT(coeffcomp, PInput, order, secretKeyDist);
+
+    parameters.SetMultiplicativeDepth(depth);
+
+    auto cc = GenCryptoContext(parameters);
+    cc->Enable(PKE);
+    cc->Enable(KEYSWITCH);
+    cc->Enable(LEVELEDSHE);
+    cc->Enable(ADVANCEDSHE);
+    cc->Enable(FHE);
+
+    std::cout << "CKKS scheme is using ring dimension " << cc->GetRingDimension() << " and a multiplicative depth of "
+              << depth << std::endl
               << std::endl;
-    MultiPrecisionSign(QBFVINIT, BigInteger(4096), BigInteger(2), (BigInteger(1) << 46), (BigInteger(1) << 35), 1, 1, 1,
-                       32, 2048);
-    std::cerr << "=====Sign evaluation of a 12-bit input using 4-bit digits order 1 fully packed=====" << std::endl
-              << std::endl;
-    MultiPrecisionSign(QBFVINIT, BigInteger(4096), BigInteger(16), (BigInteger(1) << 48), (BigInteger(1) << 40), 32, 8,
-                       1, 64, 2048);
-    std::cerr << "=====Sign evaluation of a 32-bit input using 8-bit digits order 1 fully packed=====" << std::endl
-              << std::endl;
-    MultiPrecisionSign(QBFVINITLARGE, BigInteger(1) << 32, BigInteger(256), BigInteger(1) << 71, BigInteger(1) << 47,
-                       256, 32, 1, 64, 2048);
+
+    /* 5. Compute various moduli and scaling sizes, used for scheme conversions.
+     * Then generate the setup parameters and necessary keys.
+     */
+    auto keyPair = cc->KeyGen();
+
+    if (binaryLUT)
+        cc->EvalFBTSetup(coeffint, numSlots, PInput, POutput, 1UL, keyPair.publicKey, {0, 0}, lvlb,
+                         levelsAvailableAfterBootstrap, 0, order, true);
+    else
+        cc->EvalFBTSetup(coeffcomp, numSlots, PInput, POutput, 1UL, keyPair.publicKey, {0, 0}, lvlb,
+                         levelsAvailableAfterBootstrap, 0, order, true);
+
+    cc->EvalBootstrapKeyGen(keyPair.secretKey, numSlots);
+    cc->EvalMultKeyGen(keyPair.secretKey);
+
+    /* Input */
+    std::vector<double> x = {PInput.ConvertToDouble() / 2 - 1, PInput.ConvertToDouble() / 2 + 1, 5, 4, 3, 2, 1, 0};
+    std::cerr << "First elements of the input (repeated) up to size " << numSlots << ":" << std::endl;
+    std::cerr << x << std::endl;
+    if (x.size() < numSlots)
+        x = Fill<double>(x, numSlots);
+
+    auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, 0, nullptr, numSlots);
+    auto ctxt = cc->Encrypt(keyPair.publicKey, ptxt);
+
+    std::cerr << "#levels of ctxt: " << ctxt->GetLevel() << ", depth = " << ctxt->GetNoiseScaleDeg() << std::endl;
+
+    /* 8. Apply the LUT over the ciphertext.
+    */
+    Ciphertext<DCRTPoly> ctxtAfterFBT;
+    if (binaryLUT)
+        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffint, PInput.GetMSB() - 1, ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
+    else
+        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffcomp, PInput.GetMSB() - 1, ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
+
+    std::cerr << "#levels of ctxtAfterFBT: " << ctxtAfterFBT->GetLevel() << ", depth = " << ctxtAfterFBT->GetNoiseScaleDeg() << std::endl;
+
+    Plaintext result;
+    cc->Decrypt(keyPair.secretKey, ctxtAfterFBT, &result);
+    result->SetLength(numSlots);
+    std::cerr << "Result after FBT: " << result << std::endl;
+
+    auto exact(x);
+    std::transform(x.begin(), x.end(), exact.begin(), [&](const double& elem) {
+        return func(static_cast<int64_t>(elem));
+    });
+
+    // std::transform(x.begin(), x.end(), exact.begin(), [&](const double& elem) {
+    //     return (func(static_cast<int64_t>(elem)) > POutput.ConvertToDouble() / 2.) ? func(static_cast<int64_t>(elem)) - POutput.ConvertToDouble() : func(static_cast<int64_t>(elem));
+    // });
+    std::cerr << "exact: " << exact << std::endl;
+
+    auto computed = result->GetRealPackedValue();
+
+    std::transform(exact.begin(), exact.end(), computed.begin(), exact.begin(), std::minus<double>());
+    // std::transform(exact.begin(), exact.end(), exact.begin(),
+    //                [&](const int64_t& elem) { return (std::abs(elem)) % (POutput.ConvertToInt()); });
+
+    std::transform(exact.begin(), exact.end(), exact.begin(),
+                   [&](const int64_t& elem) { return std::abs(elem); });
+
+    // std::cerr << "absolute error: " << exact << std::endl;
+
+    auto max_error_it = std::max_element(exact.begin(), exact.end());
+    std::cerr << "Max absolute error obtained: " << *max_error_it << std::endl << std::endl;
 
     return 0;
 }
 
-void ArbitraryLUT(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
+void ArbitraryLUTRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
                   uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
                   std::function<int64_t(int64_t)> func) {
     /* 1. Figure out whether sparse packing or full packing should be used.
@@ -242,7 +376,7 @@ void ArbitraryLUT(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, Bi
     std::cerr << "Max absolute error obtained: " << *max_error_it << std::endl << std::endl;
 }
 
-void MultiValueBootstrapping(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
+void MultiValueBootstrappingRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger POutput, BigInteger Q, BigInteger Bigq,
                              uint32_t scaleTHI, size_t order, uint32_t numSlots, uint32_t ringDim,
                              uint32_t levelsComputation) {
     /* 1. Figure out whether sparse packing or full packing should be used.
@@ -480,7 +614,7 @@ void MultiValueBootstrapping(BigInteger QBFVInit, BigInteger PInput, BigInteger 
     std::cerr << "Max absolute error obtained in the second LUT: " << *max_error_it << std::endl << std::endl;
 }
 
-void MultiPrecisionSign(BigInteger QBFVInit, BigInteger PInput, BigInteger PDigit, BigInteger Q, BigInteger Bigq,
+void MultiPrecisionSignRLWE(BigInteger QBFVInit, BigInteger PInput, BigInteger PDigit, BigInteger Q, BigInteger Bigq,
                         uint32_t scaleTHI, uint32_t scaleStepTHI, size_t order, uint32_t numSlots, uint32_t ringDim) {
     /* 1. Figure out whether sparse packing or full packing should be used.
      * numSlots represents the number of values to be encrypted in BFV.

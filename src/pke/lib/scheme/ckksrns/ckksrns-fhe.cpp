@@ -1175,6 +1175,8 @@ std::vector<std::vector<ReadOnlyPlaintext>> FHECKKSRNS::EvalCoeffsToSlotsPrecomp
     for (uint32_t i = 0; i < towersToDrop; ++i)
         elementParams.PopLastParam();
 
+    std::cerr << "towersToDrop = " << towersToDrop << ", elementParams.GetParams().size() = " << elementParams.GetParams().size() << ", L = " << L << std::endl;
+
     uint32_t level0 = towersToDrop + compositeDegree * (levelBudget - 1);
 
     auto paramsQ   = elementParams.GetParams();
@@ -1213,6 +1215,7 @@ std::vector<std::vector<ReadOnlyPlaintext>> FHECKKSRNS::EvalCoeffsToSlotsPrecomp
         auto coeff = CoeffEncodingCollapse(A, rotGroup, levelBudget, flag_i);
 
         for (int32_t s = levelBudget - 1; s > stop; s--) {
+            std::cerr << "level0 - compositeDegree * s: " << level0 - compositeDegree * s << std::endl;
             for (int32_t i = 0; i < b; i++) {
 #if !defined(__MINGW32__) && !defined(__MINGW64__)
     #pragma omp parallel for
@@ -1238,6 +1241,7 @@ std::vector<std::vector<ReadOnlyPlaintext>> FHECKKSRNS::EvalCoeffsToSlotsPrecomp
         }
 
         if (flagRem) {
+            std::cerr << "level0: " << level0 << std::endl;
             for (int32_t i = 0; i < bRem; i++) {
 #pragma omp parallel for
                 for (int32_t j = 0; j < gRem; j++) {
@@ -1349,6 +1353,7 @@ std::vector<std::vector<ReadOnlyPlaintext>> FHECKKSRNS::EvalSlotsToCoeffsPrecomp
     auto elementParams       = *(cryptoParams->GetElementParams());
 
     uint32_t towersToDrop = (L == 0) ? 0 : elementParams.GetParams().size() - L - compositeDegree * levelBudget;
+    std::cerr << "towersToDrop = " << towersToDrop << ", elementParams.GetParams().size() = " << elementParams.GetParams().size() << ", L = " << L << std::endl;
     for (uint32_t i = 0; i < towersToDrop; ++i)
         elementParams.PopLastParam();
 
@@ -1385,6 +1390,7 @@ std::vector<std::vector<ReadOnlyPlaintext>> FHECKKSRNS::EvalSlotsToCoeffsPrecomp
         auto coeff = CoeffDecodingCollapse(A, rotGroup, levelBudget, flag_i);
 
         for (int32_t s = 0; s < levelBudget - flagRem; s++) {
+            std::cerr << "level0 + s*compositeDegree = " << level0 + s * compositeDegree << std::endl;
             for (int32_t i = 0; i < b; i++) {
 #pragma omp parallel for
                 for (int32_t j = 0; j < g; j++) {
@@ -1407,6 +1413,7 @@ std::vector<std::vector<ReadOnlyPlaintext>> FHECKKSRNS::EvalSlotsToCoeffsPrecomp
 
         if (flagRem) {
             int32_t s = levelBudget - flagRem;
+            std::cerr << "level0 + s*compositeDegree = " << level0 + s * compositeDegree << std::endl;
             for (int32_t i = 0; i < bRem; i++) {
 #pragma omp parallel for
                 for (int32_t j = 0; j < gRem; j++) {
@@ -2534,7 +2541,7 @@ void FHECKKSRNS::EvalFBTSetupInternal(const CryptoContextImpl<DCRTPoly>& cc, con
                                       uint32_t numSlots, const BigInteger& PIn, const BigInteger& POut,
                                       const BigInteger& Bigq, const PublicKey<DCRTPoly>& pubKey,
                                       const std::vector<uint32_t>& dim1, const std::vector<uint32_t>& levelBudget,
-                                      uint32_t lvlsAfterBoot, uint32_t depthLeveledComputation, size_t order) {
+                                      uint32_t lvlsAfterBoot, uint32_t depthLeveledComputation, size_t order, bool pureCKKS) {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc.GetCryptoParameters());
     if (cryptoParams->GetScalingTechnique() == FLEXIBLEAUTO || cryptoParams->GetScalingTechnique() == FLEXIBLEAUTOEXT)
         OPENFHE_THROW("CKKS Functional Bootstrapping is supported for FIXEDMANUAL and FIXEDAUTO methods only.");
@@ -2618,7 +2625,13 @@ void FHECKKSRNS::EvalFBTSetupInternal(const CryptoContextImpl<DCRTPoly>& cc, con
     double pre      = qDouble / factor;
     double scaleEnc = pre / k;
     double scaleMod = QPrime.ConvertToLongDouble() / (Bigq.ConvertToLongDouble() * POut.ConvertToDouble());
-    double scaleDec = scaleMod / pre;
+    double scaleDec = 1. / pre;
+    std::cerr << "1/pre: " << scaleDec << std::endl;
+    scaleEnc = (!pureCKKS) ? scaleEnc : scaleEnc; 
+    scaleDec = (!pureCKKS) ? scaleDec * scaleMod : scaleDec / PIn.ConvertToDouble();
+
+    std::cerr << "scaleEnc: " << scaleEnc << std::endl;
+    std::cerr << "scaleDec: " << scaleDec << std::endl;
 
     // one level for division and double-angle formula
     uint32_t approxModDepth = 1 + 1;
@@ -2629,8 +2642,24 @@ void FHECKKSRNS::EvalFBTSetupInternal(const CryptoContextImpl<DCRTPoly>& cc, con
 
     // compute # of levels to remain when encoding the coefficients
     uint32_t L0   = cryptoParams->GetElementParams()->GetParams().size();
-    uint32_t lEnc = L0 - levelBudget[0] - 1;
-    uint32_t lDec = L0 - depthBT;
+    std::cerr << "L0: " << L0 << std::endl;
+    uint lEnc, lDec;
+    if (!pureCKKS) {
+        lEnc = L0 - levelBudget[0] - 1;
+        lDec = L0 - depthBT;
+    }
+    else {
+        // // Andreea: This is to purely test Decoding + Encoding
+        // lEnc = 1;
+        // lDec = 5;
+
+        // Andreea: This is to test Decoding + Encoding + EvalLUT, without AdjustCiphertext
+        lEnc = approxModDepth + depthLeveledComputation + AdjustDepthFBT(coeffs, PIn, order, skd) - lvlsAfterBoot;
+        lDec = levelBudget[0] + 1 + approxModDepth + depthLeveledComputation + AdjustDepthFBT(coeffs, PIn, order, skd) - lvlsAfterBoot;
+
+        // lEnc = L0 - levelBudget[0] - 2 - lvlsAfterBoot;
+        // lDec = 2; // Andreea: 1 without correction (AdjustCiphertext)
+    }
 
     bool isLTBootstrap = (levelBudget[0] == 1) && (levelBudget[1] == 1);
     if (isLTBootstrap) {
@@ -2659,7 +2688,9 @@ void FHECKKSRNS::EvalFBTSetupInternal(const CryptoContextImpl<DCRTPoly>& cc, con
         }
     }
     else {
+        std::cerr << "CtS lEnc: " << lEnc << std::endl;
         precom->m_U0hatTPreFFT = EvalCoeffsToSlotsPrecompute(cc, ksiPows, rotGroup, false, scaleEnc, lEnc);
+        std::cerr << "CtS lDec: " << lDec << std::endl;
         precom->m_U0PreFFT     = EvalSlotsToCoeffsPrecompute(cc, ksiPows, rotGroup, false, scaleDec, lDec);
     }
 }
@@ -2669,30 +2700,38 @@ void FHECKKSRNS::EvalFBTSetup(const CryptoContextImpl<DCRTPoly>& cc,
                               const BigInteger& PIn, const BigInteger& POut, const BigInteger& Bigq,
                               const PublicKey<DCRTPoly>& pubKey, const std::vector<uint32_t>& dim1,
                               const std::vector<uint32_t>& levelBudget, uint32_t lvlsAfterBoot,
-                              uint32_t depthLeveledComputation, size_t order) {
+                              uint32_t depthLeveledComputation, size_t order, bool pureCKKS) {
     EvalFBTSetupInternal(cc, coefficients, numSlots, PIn, POut, Bigq, pubKey, dim1, levelBudget, lvlsAfterBoot,
-                         depthLeveledComputation, order);
+                         depthLeveledComputation, order, pureCKKS);
 }
 
 void FHECKKSRNS::EvalFBTSetup(const CryptoContextImpl<DCRTPoly>& cc, const std::vector<int64_t>& coefficients,
                               uint32_t numSlots, const BigInteger& PIn, const BigInteger& POut, const BigInteger& Bigq,
                               const PublicKey<DCRTPoly>& pubKey, const std::vector<uint32_t>& dim1,
                               const std::vector<uint32_t>& levelBudget, uint32_t lvlsAfterBoot,
-                              uint32_t depthLeveledComputation, size_t order) {
+                              uint32_t depthLeveledComputation, size_t order, bool pureCKKS) {
     EvalFBTSetupInternal(cc, coefficients, numSlots, PIn, POut, Bigq, pubKey, dim1, levelBudget, lvlsAfterBoot,
-                         depthLeveledComputation, order);
+                         depthLeveledComputation, order, pureCKKS);
 }
 
 Ciphertext<DCRTPoly> FHECKKSRNS::EvalHomDecoding(ConstCiphertext<DCRTPoly>& ciphertext, uint64_t postScaling,
                                                  uint32_t levelToReduce) {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ciphertext->GetCryptoParameters());
-
     auto ctxtEnc = ciphertext->Clone();
 
     // Drop levels if needed
+
+    // Andreea: In pure CKKS, so StC is done first, we need to drop all levels except lvl[1].
+    // When StC is done at the end of FBT, then levelToReduce can specify a number of levels to drop due to 
+    // intermediate computations.
+    // Based on the flag in EvalFBT, we set the levelToReduce accordingly.
+    size_t sizeQl = ctxtEnc->GetElements()[0].GetNumOfElements();
     auto cc = ciphertext->GetCryptoContext();
-    if (levelToReduce > 0)
+    if (levelToReduce > 0 && levelToReduce < sizeQl)
         cc->LevelReduceInPlace(ctxtEnc, nullptr, levelToReduce);
+
+    std::cerr << "ctxt level after levelToReduce: " << ctxtEnc->GetLevel() << ", depth: " << ctxtEnc->GetNoiseScaleDeg() << std::endl;
+
 
     //------------------------------------------------------------------------------
     // Running SlotsToCoeffs
@@ -2716,13 +2755,338 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalHomDecoding(ConstCiphertext<DCRTPoly>& ciph
     }
 
     // Because the linear transform might be scaled differently, we might need to scale up the result separately
-    // Often, this scaling addreesses the previous division in the trigonometric Hermite coefficients
+    // Often, this scaling addresses the previous division in the trigonometric Hermite coefficients
     if (postScaling > 1)
         cc->GetScheme()->MultByIntegerInPlace(ctxtDec, postScaling);
 
+    std::cerr << "ctxtDec level: " << ctxtDec->GetLevel() << ", depth: " << ctxtDec->GetNoiseScaleDeg() << std::endl;
+
     cc->ModReduceInPlace(ctxtDec);
     // 64-bit only: No need to scale back the message to its original scale.
+
+    std::cerr << "ctxtDec level: " << ctxtDec->GetLevel() << ", depth: " << ctxtDec->GetNoiseScaleDeg() << std::endl;
     return ctxtDec;
+}
+
+template <typename VectorDataType>
+std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
+    ConstCiphertext<DCRTPoly>& ciphertext, const std::vector<VectorDataType>& coefficients, uint32_t digitBitSize,
+    const BigInteger& initialScaling, size_t order) {
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ciphertext->GetCryptoParameters());
+    if (cryptoParams->GetScalingTechnique() == FLEXIBLEAUTO || cryptoParams->GetScalingTechnique() == FLEXIBLEAUTOEXT)
+        OPENFHE_THROW("CKKS Functional Bootstrapping is supported for FIXEDMANUAL and FIXEDAUTO methods only.");
+    if (cryptoParams->GetKeySwitchTechnique() != HYBRID)
+        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid key switching method.");
+
+    auto cc = ciphertext->GetCryptoContext();
+    auto M  = cc->GetCyclotomicOrder();
+    auto N  = cc->GetRingDimension();
+
+    // // We don't need the type of scaling and correction as in the standard CKKS bootstrapping
+    // // because the message doesn't have to be scaled down.
+    // // Instead, we need to correct the encoding if it originates from a different ciphertext
+    // // (not typical CKKS).
+    // double correction = cryptoParams->GetScalingFactorRealBig(0) / initialScaling.ConvertToDouble();
+    // std::cerr << "correction: " << correction << std::endl;
+    
+    //------------------------------------------------------------------------------
+    // RAISING THE MODULUS
+    //------------------------------------------------------------------------------
+
+    auto paramsQ   = cryptoParams->GetElementParams()->GetParams();
+    uint32_t sizeQ = paramsQ.size();
+    std::vector<NativeInteger> moduli(sizeQ);
+    std::vector<NativeInteger> roots(sizeQ);
+    for (uint32_t i = 0; i < sizeQ; ++i) {
+        moduli[i] = paramsQ[i]->GetModulus();
+        roots[i]  = paramsQ[i]->GetRootOfUnity();
+    }
+
+    auto elementParamsRaisedPtr = std::make_shared<ILDCRTParams<DCRTPoly::Integer>>(M, moduli, roots);
+
+    double qDouble = GetBigModulus(cryptoParams);
+    double powP    = std::pow(2, cryptoParams->GetPlaintextModulus());
+    int32_t deg    = std::round(std::log2(qDouble / powP));
+// #if NATIVEINT != 128
+//     if (deg > static_cast<int32_t>(m_correctionFactor)) {
+//         OPENFHE_THROW("Degree [" + std::to_string(deg) + "] must be less than or equal to the correction factor [" +
+//                       std::to_string(m_correctionFactor) + "].");
+//     }
+// #endif
+    uint32_t correction = m_correctionFactor - deg;
+    double post         = std::pow(2, static_cast<double>(deg));
+
+    // TODO: YSP Can be extended to FLEXIBLE* scaling techniques as well as the closeness of 2^p to moduli is no longer needed
+    double pre      = 1. / post;
+    uint64_t scalar = std::llround(post);
+
+    auto raised = ciphertext->Clone();
+    auto algo   = cc->GetScheme();
+    // algo->ModReduceInternalInPlace(raised, raised->GetNoiseScaleDeg() - 1); // Andreea: this is done in EvalHomDecoding
+
+    std::cerr << "correction : " << correction << ", pre: " << pre << ", scalar: " << scalar << ", post = " << post << std::endl;
+
+    // // If correction ~ 1, we should not do this adjustment and save a level
+    // if (std::llround(correction) != 1.0)
+    //     AdjustCiphertext(raised, correction);
+
+    // uint32_t L0 = cryptoParams->GetElementParams()->GetParams().size();
+    // if (cryptoParams->GetSecretKeyDist() == SPARSE_ENCAPSULATED) {
+    //     auto evalKeyMap = cc->GetEvalAutomorphismKeyMap(raised->GetKeyTag());
+
+    //     // transform from a denser secret to a sparser one
+    //     raised = KeySwitchSparse(raised, evalKeyMap.at(2 * N - 4));
+
+    //     // Only level 0 ciphertext used here. Other towers ignored to make CKKS bootstrapping faster.
+    //     auto& ctxtDCRT = raised->GetElements();
+    //     for (auto& poly : ctxtDCRT) {
+    //         poly.SetFormat(COEFFICIENT);
+    //         DCRTPoly temp(elementParamsRaisedPtr, COEFFICIENT);
+    //         temp = poly.GetElementAtIndex(0);
+    //         temp.SetFormat(EVALUATION);
+    //         poly = std::move(temp);
+    //     }
+    //     raised->SetLevel(L0 - ctxtDCRT[0].GetNumOfElements());
+
+    //     // go back to a denser secret
+    //     algo->KeySwitchInPlace(raised, evalKeyMap.at(2 * N - 2));
+    // }
+    // else {
+    //     // Only level 0 ciphertext used here. Other towers ignored to make CKKS bootstrapping faster.
+    //     auto& ctxtDCRT = raised->GetElements();
+    //     for (auto& poly : ctxtDCRT) {
+    //         poly.SetFormat(COEFFICIENT);
+    //         DCRTPoly temp(elementParamsRaisedPtr, COEFFICIENT);
+    //         temp = poly.GetElementAtIndex(0);
+    //         temp.SetFormat(EVALUATION);
+    //         poly = std::move(temp);
+    //     }
+    //     raised->SetLevel(L0 - ctxtDCRT[0].GetNumOfElements());
+    // }
+
+#ifdef BOOTSTRAPTIMING
+    std::cerr << "\nNumber of levels at the beginning of bootstrapping: "
+              << raised->GetElements()[0].GetNumOfElements() - 1 << std::endl;
+#endif
+    std::cerr << "\nNumber of levels at the beginning of bootstrapping: "
+              << raised->GetElements()[0].GetNumOfElements() - 1 << ", level: " << raised->GetLevel() << ", depth: " << raised->GetNoiseScaleDeg() <<  std::endl;
+
+    //------------------------------------------------------------------------------
+    // SETTING PARAMETERS FOR APPROXIMATE MODULAR REDUCTION
+    //------------------------------------------------------------------------------
+
+    auto skd = cryptoParams->GetSecretKeyDist();
+    double k = (skd == SPARSE_TERNARY || skd == SPARSE_ENCAPSULATED) ? 1.0 : K_UNIFORM;
+
+    double constantEvalMult = 1.0 / (k * N);
+    // double constantEvalMult = pre / (k * N);
+    cc->EvalMultInPlace(raised, constantEvalMult);
+
+    std::cerr << "raise level: " << raised->GetLevel() << ", depth: " << raised->GetNoiseScaleDeg() << std::endl;
+
+    // no linear transformations are needed for Chebyshev series as the range has been normalized to [-1,1]
+    double coeffLowerBound = -1.0;
+    double coeffUpperBound = 1.0;
+
+    auto slots         = ciphertext->GetSlots();
+    auto& p            = GetBootPrecom(slots);
+    bool isLTBootstrap = (p.m_levelEnc == 1) && (p.m_levelDec == 1);
+
+    std::vector<Ciphertext<DCRTPoly>> ctxtEnc;
+    std::shared_ptr<seriesPowers<DCRTPoly>> ctxtPowers;
+
+    if (slots == M / 4) {
+        //------------------------------------------------------------------------------
+        // FULLY PACKED CASE
+        //------------------------------------------------------------------------------
+
+        //------------------------------------------------------------------------------
+        // Running CoeffToSlot
+        //------------------------------------------------------------------------------
+
+        // need to call internal modular reduction so it also works for FLEXIBLEAUTO
+        algo->ModReduceInternalInPlace(raised, BASE_NUM_LEVELS_TO_DROP);
+
+        // only one linear transform is needed as the other one can be derived
+        ctxtEnc.emplace_back((isLTBootstrap) ? EvalLinearTransform(p.m_U0hatTPre, raised) :
+                                               EvalCoeffsToSlots(p.m_U0hatTPreFFT, raised));
+
+        auto conj = Conjugate(ctxtEnc[0], cc->GetEvalAutomorphismKeyMap(ctxtEnc[0]->GetKeyTag()));
+
+        ctxtEnc.emplace_back(cc->EvalSub(ctxtEnc[0], conj));
+        cc->EvalAddInPlaceNoCheck(ctxtEnc[0], conj);
+        algo->MultByMonomialInPlace(ctxtEnc[1], 3 * M / 4);
+
+        if (cryptoParams->GetScalingTechnique() == FIXEDMANUAL) {
+            while (ctxtEnc[0]->GetNoiseScaleDeg() > 1) {
+                cc->ModReduceInPlace(ctxtEnc[0]);
+                cc->ModReduceInPlace(ctxtEnc[1]);
+            }
+        }
+        else {
+            if (ctxtEnc[0]->GetNoiseScaleDeg() == 2) {
+                algo->ModReduceInternalInPlace(ctxtEnc[0], BASE_NUM_LEVELS_TO_DROP);
+                algo->ModReduceInternalInPlace(ctxtEnc[1], BASE_NUM_LEVELS_TO_DROP);
+            }
+        }
+        std::cerr << "ctxtEnc[0] level: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+
+        //------------------------------------------------------------------------------
+        // Computing the powers for Approximate Mod Reduction
+        //------------------------------------------------------------------------------
+
+        if (digitBitSize == 1 && order == 1) {
+            auto& coeff_cos = (skd == SPARSE_ENCAPSULATED) ? coeff_cos_16_double : coeff_cos_25_double;
+
+            ctxtEnc[0] = cc->EvalChebyshevSeries(ctxtEnc[0], coeff_cos, coeffLowerBound, coeffUpperBound);
+            // Andreea: we need a flag for full complex packing as opposed to full real packing
+            // ctxtEnc[1] = cc->EvalChebyshevSeries(ctxtEnc[1], coeff_cos, coeffLowerBound, coeffUpperBound);
+
+            std::cerr << "ctxtEnc[0] after Cheby level: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+
+            // Double angle-iterations to get cos(pi*x)
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->EvalAddInPlaceNoCheck(ctxtEnc[0], ctxtEnc[0]);
+            cc->EvalSubInPlace(ctxtEnc[0], 1.0);
+            cc->ModReduceInPlace(ctxtEnc[0]);  // cos(pi x)
+            // cc->EvalSquareInPlace(ctxtEnc[1]);
+            // cc->EvalAddInPlaceNoCheck(ctxtEnc[1], ctxtEnc[1]);
+            // cc->EvalSubInPlace(ctxtEnc[1], 1.0);
+            // cc->ModReduceInPlace(ctxtEnc[1]);  // cos(pi x)
+
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->ModReduceInPlace(ctxtEnc[0]);  // cos^2(pi x)
+            // cc->EvalSquareInPlace(ctxtEnc[1]);
+            // cc->ModReduceInPlace(ctxtEnc[1]);  // cos^2(pi x)
+
+            std::cerr << "ctxtEnc[0] level after double angle: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+        }
+        else {
+            auto& coeff_exp = (skd == SPARSE_ENCAPSULATED) ? coeff_exp_16_double_46 :
+                              (digitBitSize > 10)          ? coeff_exp_25_double_66 :
+                                                             coeff_exp_25_double_58;
+
+            // Obtain exp(Pi/2*i*x) approximation via Chebyshev Basis Polynomial Interpolation
+            ctxtEnc[0] = cc->EvalChebyshevSeries(ctxtEnc[0], coeff_exp, coeffLowerBound, coeffUpperBound);
+            // ctxtEnc[1] = cc->EvalChebyshevSeries(ctxtEnc[1], coeff_exp, coeffLowerBound, coeffUpperBound);
+
+            std::cerr << "ctxtEnc[0] after Cheby level: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+
+            // Double angle-iterations to get exp(2*Pi*i*x)
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->ModReduceInPlace(ctxtEnc[0]);
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->ModReduceInPlace(ctxtEnc[0]);
+
+            // cc->EvalSquareInPlace(ctxtEnc[1]);
+            // cc->ModReduceInPlace(ctxtEnc[1]);
+            // cc->EvalSquareInPlace(ctxtEnc[1]);
+            // cc->ModReduceInPlace(ctxtEnc[1]);
+            std::cerr << "ctxtEnc[0] level after double angle: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+        }
+
+        ctxtPowers = cc->EvalPowers(ctxtEnc[0], coefficients);
+        // auto ctxtPowersIm = cc->EvalPowers(ctxtEnc[1], coefficients);
+        // if (ctxtPowersRe->powers2Re.size() == 0) {
+        //     ctxtPowers = std::make_shared<seriesPowers<DCRTPoly>>(ctxtPowersRe->powersRe, ctxtPowersIm->powersRe);
+        // }
+        // else {
+        //     ctxtPowers = std::make_shared<seriesPowers<DCRTPoly>>(
+        //         ctxtPowersRe->powersRe, ctxtPowersRe->powers2Re, ctxtPowersRe->power2km1Re, ctxtPowersRe->k,
+        //         ctxtPowersRe->m, ctxtPowersIm->powersRe, ctxtPowersIm->powers2Re, ctxtPowersIm->power2km1Re);
+        // }
+    }
+    else {
+        //------------------------------------------------------------------------------
+        // SPARSELY PACKED CASE
+        //------------------------------------------------------------------------------
+
+        //------------------------------------------------------------------------------
+        // Running PartialSum
+        //------------------------------------------------------------------------------
+
+        for (uint32_t j = 1; j < N / (2 * slots); j <<= 1)
+            cc->EvalAddInPlaceNoCheck(raised, cc->EvalRotate(raised, j * slots));
+
+        //------------------------------------------------------------------------------
+        // Running CoeffsToSlots
+        //------------------------------------------------------------------------------
+
+        algo->ModReduceInternalInPlace(raised, BASE_NUM_LEVELS_TO_DROP);
+
+        ctxtEnc.emplace_back((isLTBootstrap) ? EvalLinearTransform(p.m_U0hatTPre, raised) :
+                                               EvalCoeffsToSlots(p.m_U0hatTPreFFT, raised));
+
+        auto evalKeyMap = cc->GetEvalAutomorphismKeyMap(ctxtEnc[0]->GetKeyTag());
+        auto conj       = Conjugate(ctxtEnc[0], evalKeyMap);
+        cc->EvalAddInPlaceNoCheck(ctxtEnc[0], conj);
+
+        if (cryptoParams->GetScalingTechnique() == FIXEDMANUAL) {
+            while (ctxtEnc[0]->GetNoiseScaleDeg() > 1)
+                cc->ModReduceInPlace(ctxtEnc[0]);
+        }
+        else {
+            if (ctxtEnc[0]->GetNoiseScaleDeg() == 2)
+                algo->ModReduceInternalInPlace(ctxtEnc[0], BASE_NUM_LEVELS_TO_DROP);
+        }
+
+        //------------------------------------------------------------------------------
+        // Running Approximate Mod Reduction
+        //------------------------------------------------------------------------------
+
+        if (digitBitSize == 1 && order == 1) {
+            auto& coeff_cos = (skd == SPARSE_ENCAPSULATED) ? coeff_cos_16_double : coeff_cos_25_double;
+
+            ctxtEnc[0] = cc->EvalChebyshevSeries(ctxtEnc[0], coeff_cos, coeffLowerBound, coeffUpperBound);
+            std::cerr << "ctxtEnc[0] after Cheby level: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+
+            // Double angle-iterations to get cos(pi*x)
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->EvalAddInPlaceNoCheck(ctxtEnc[0], ctxtEnc[0]);
+            cc->EvalSubInPlace(ctxtEnc[0], 1.0);
+            cc->ModReduceInPlace(ctxtEnc[0]);  // cos(pi x)
+
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->ModReduceInPlace(ctxtEnc[0]);  // cos^2(pi x)
+            std::cerr << "ctxtEnc[0] after double angle: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+        }
+        else {
+            auto& coeff_exp = (skd == SPARSE_ENCAPSULATED) ? coeff_exp_16_double_46 :
+                              (digitBitSize > 10)          ? coeff_exp_25_double_66 :
+                                                             coeff_exp_25_double_58;
+
+            // Obtain exp(Pi/2*i*x) approximation via Chebyshev Basis Polynomial Interpolation
+            ctxtEnc[0] = cc->EvalChebyshevSeries(ctxtEnc[0], coeff_exp, coeffLowerBound, coeffUpperBound);
+            std::cerr << "ctxtEnc[0] after Cheby level: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+
+            // Double angle-iterations to get exp(2*Pi*i*x)
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->ModReduceInPlace(ctxtEnc[0]);
+            cc->EvalSquareInPlace(ctxtEnc[0]);
+            cc->ModReduceInPlace(ctxtEnc[0]);
+
+            std::cerr << "ctxtEnc[0] after double angle: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+
+        }
+
+        // No need to scale the message back up after Chebyshev interpolation
+        ctxtPowers = cc->EvalPowers(ctxtEnc[0], coefficients);
+    }
+
+    // 64-bit only: No need to scale back the message to its original scale.
+    return ctxtPowers;
+}
+
+std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncoding(
+    ConstCiphertext<DCRTPoly>& ciphertext, const std::vector<std::complex<double>>& coefficients, uint32_t digitBitSize,
+    const BigInteger& initialScaling, size_t order) {
+    return EvalHomEncodingInternal(ciphertext, coefficients, digitBitSize, initialScaling, order);
+}
+std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncoding(ConstCiphertext<DCRTPoly>& ciphertext,
+                                                                      const std::vector<int64_t>& coefficients,
+                                                                      uint32_t digitBitSize,
+                                                                      const BigInteger& initialScaling, size_t order) {
+    return EvalHomEncodingInternal(ciphertext, coefficients, digitBitSize, initialScaling, order);
 }
 
 template <typename VectorDataType>
@@ -2987,6 +3351,8 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalMVBPrecomputeInternal(
             cc->ModReduceInPlace(ctxtEnc[0]);
         }
 
+    std::cerr << "ctxtEnc[0] after double angle: " << ctxtEnc[0]->GetLevel() << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
+
         // No need to scale the message back up after Chebyshev interpolation
         ctxtPowers = cc->EvalPowers(ctxtEnc[0], coefficients);
     }
@@ -3130,23 +3496,199 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalMVBNoDecodingInternal(const std::shared_ptr
     return ctxtEnc;
 }
 
+template <typename VectorDataType>
+Ciphertext<DCRTPoly> FHECKKSRNS::EvalLUTInternal(const std::shared_ptr<seriesPowers<DCRTPoly>> ciphertexts,
+                                                           const std::vector<VectorDataType>& coefficients,
+                                                           uint32_t digitBitSize, uint64_t postScaling, size_t order) {
+    std::cerr << "EvalLUT" << std::endl;
+    std::cerr << ciphertexts->powersRe.size() << " powers in the real part and " << ciphertexts->powersIm.size()
+              << " powers in the imaginary part." << std::endl;
+    const auto cryptoParams =
+        std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ciphertexts->powersRe[0]->GetCryptoParameters());
+    if (cryptoParams->GetScalingTechnique() == FLEXIBLEAUTO || cryptoParams->GetScalingTechnique() == FLEXIBLEAUTOEXT)
+        OPENFHE_THROW("CKKS Functional Bootstrapping is supported for FIXEDMANUAL and FIXEDAUTO methods only.");
+    if (cryptoParams->GetKeySwitchTechnique() != HYBRID)
+        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid key switching method.");
+
+    auto cc        = ciphertexts->powersRe[0]->GetCryptoContext();
+    uint32_t M     = cc->GetCyclotomicOrder();
+    uint32_t slots = ciphertexts->powersRe[0]->GetSlots();
+    auto algo      = cc->GetScheme();
+
+    Ciphertext<DCRTPoly> ctxtEnc;
+
+    if (slots == M / 4) {
+        //------------------------------------------------------------------------------
+        // FULLY PACKED CASE
+        //------------------------------------------------------------------------------
+        // if (ciphertexts->powersIm.size() == 0)
+        //     OPENFHE_THROW("Full packing requires powers for both the real and imaginary parts.");
+        // Ciphertext<DCRTPoly> ctxtEncI;
+
+        //------------------------------------------------------------------------------
+        // Running Approximate Mod Reduction using the complex explonential
+        //------------------------------------------------------------------------------
+
+        if (digitBitSize == 1 && order == 1) {
+            ctxtEnc  = ciphertexts->powersRe[0];
+            // ctxtEncI = ciphertexts->powersIm[0];
+            // Assumes the function is integer and real!
+            if (ToReal(coefficients[1]) > 0) {  // MultByInteger only works with positive integers
+                algo->MultByIntegerInPlace(ctxtEnc, ToReal(coefficients[1]));
+                cc->EvalAddInPlace(ctxtEnc, ToReal(coefficients[0]));
+                // algo->MultByIntegerInPlace(ctxtEncI, ToReal(coefficients[1]));
+                // cc->EvalAddInPlace(ctxtEncI, ToReal(coefficients[0]));
+            }
+            else {
+                algo->MultByIntegerInPlace(ctxtEnc, -ToReal(coefficients[1]));
+                ctxtEnc = cc->EvalSub(ToReal(coefficients[0]), ctxtEnc);
+                // algo->MultByIntegerInPlace(ctxtEncI, -ToReal(coefficients[1]));
+                // ctxtEncI = cc->EvalSub(ToReal(coefficients[0]), ctxtEncI);
+            }
+        }
+        else {
+            // Obtain the complex Hermite Trigonometric Interpolation via Power Basis Polynomial Interpolation
+            // Coefficients are divided by 2
+            std::shared_ptr<seriesPowers<DCRTPoly>> ctxtPowersRe; //, ctxtPowersIm;
+            if (ciphertexts->powers2Re.size() == 0) {
+                ctxtPowersRe = std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersRe);
+                // ctxtPowersIm = std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersIm);
+            }
+            else {
+                ctxtPowersRe =
+                    std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersRe, ciphertexts->powers2Re,
+                                                             ciphertexts->power2km1Re, ciphertexts->k, ciphertexts->m);
+                // ctxtPowersIm =
+                //     std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersIm, ciphertexts->powers2Im,
+                //                                              ciphertexts->power2km1Im, ciphertexts->k, ciphertexts->m);
+            }
+
+            // Take the real part
+            // Division by 2 was already performed
+            ctxtEnc  = cc->EvalPolyWithPrecomp(ctxtPowersRe, coefficients);
+            cc->EvalAddInPlaceNoCheck(ctxtEnc, Conjugate(ctxtEnc, cc->GetEvalAutomorphismKeyMap(ctxtEnc->GetKeyTag())));
+            // ctxtEncI = cc->EvalPolyWithPrecomp(ctxtPowersIm, coefficients);
+            // cc->EvalAddInPlaceNoCheck(ctxtEncI, Conjugate(ctxtEncI, cc->GetEvalAutomorphismKeyMap(ctxtEnc->GetKeyTag())));
+        }
+
+        // algo->MultByMonomialInPlace(ctxtEncI, M / 4);
+        // cc->EvalAddInPlaceNoCheck(ctxtEnc, ctxtEncI);
+        // No need to scale the message back up after Chebyshev interpolation
+    }
+    else {
+        //------------------------------------------------------------------------------
+        // SPARSELY PACKED CASE
+        //------------------------------------------------------------------------------
+
+        //------------------------------------------------------------------------------
+        // Running Approximate Mod Reduction using the complex exponential
+        //------------------------------------------------------------------------------
+
+        if (digitBitSize == 1 && order == 1) {
+            ctxtEnc = ciphertexts->powersRe[0];
+            // Assumes the function is integer and real!
+            if (ToReal(coefficients[1]) > 0) {  // MultByInteger only works with positive integers
+                algo->MultByIntegerInPlace(ctxtEnc, ToReal(coefficients[1]));
+                cc->EvalAddInPlace(ctxtEnc, ToReal(coefficients[0]));
+            }
+            else {
+                algo->MultByIntegerInPlace(ctxtEnc, -ToReal(coefficients[1]));
+                ctxtEnc = cc->EvalSub(ToReal(coefficients[0]), ctxtEnc);
+            }
+        }
+        else {
+            // Obtain the complex Hermite Trigonometric Interpolation via Power Basis Polynomial Interpolation
+            // Coefficients are divided by 2
+            std::shared_ptr<seriesPowers<DCRTPoly>> ctxtPowersRe;
+            if (ciphertexts->powers2Re.size() == 0) {
+                ctxtPowersRe = std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersRe);
+            }
+            else {
+                ctxtPowersRe =
+                    std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersRe, ciphertexts->powers2Re,
+                                                             ciphertexts->power2km1Re, ciphertexts->k, ciphertexts->m);
+            }
+            ctxtEnc = cc->EvalPolyWithPrecomp(ctxtPowersRe, coefficients);
+
+            // Take the real part
+            // Division by 2 was already performed
+            cc->EvalAddInPlaceNoCheck(ctxtEnc, Conjugate(ctxtEnc, cc->GetEvalAutomorphismKeyMap(ctxtEnc->GetKeyTag())));
+        }
+
+        // No need to scale the message back up after Chebyshev interpolation
+    }
+
+    if (postScaling > 1)
+        cc->GetScheme()->MultByIntegerInPlace(ctxtEnc, postScaling);
+
+    // // Andreea: check that this is not different from what is in Setup
+    // auto elementParamsRaised = *(cryptoParams->GetElementParams());
+
+    // auto paramsQ = elementParamsRaised.GetParams();
+    // usint sizeQ  = paramsQ.size();
+
+    // std::vector<NativeInteger> moduli(sizeQ);
+    // std::vector<NativeInteger> roots(sizeQ);
+    // for (size_t i = 0; i < sizeQ; i++) {
+    //     moduli[i] = paramsQ[i]->GetModulus();
+    //     roots[i]  = paramsQ[i]->GetRootOfUnity();
+    // }
+    // auto elementParamsRaisedPtr = std::make_shared<ILDCRTParams<DCRTPoly::Integer>>(M, moduli, roots);
+    // NativeInteger q = elementParamsRaisedPtr->GetParams()[0]->GetModulus().ConvertToInt();
+    // double qDouble  = q.ConvertToDouble();
+
+    // const auto p = cryptoParams->GetPlaintextModulus();
+    // double powP  = pow(2, p);
+    // int32_t deg = std::round(std::log2(qDouble / powP));
+    // double post         = std::pow(2, static_cast<double>(deg));
+    // uint64_t scalar = std::llround(post);
+
+    // std::cerr << "scalar = " << scalar << std::endl;
+
+    // if (postScaling * scalar > 1)
+    //     cc->GetScheme()->MultByIntegerInPlace(ctxtEnc, postScaling * scalar);
+
+    // // 64-bit only: No need to scale back the message to its original scale.
+    return ctxtEnc;
+}
+
 Ciphertext<DCRTPoly> FHECKKSRNS::EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
                                          const std::vector<std::complex<double>>& coefficients, uint32_t digitBitSize,
                                          const BigInteger& initialScaling, uint64_t postScaling, uint32_t levelToReduce,
-                                         size_t order) {
-    return EvalHomDecoding(EvalMVBNoDecodingInternal(
-                               EvalMVBPrecomputeInternal(ciphertext, coefficients, digitBitSize, initialScaling, order),
-                               coefficients, digitBitSize, order),
-                           postScaling, levelToReduce);
+                                         size_t order, bool pureCKKS) {
+    if (!pureCKKS) {
+        return EvalHomDecoding(EvalMVBNoDecodingInternal(
+                                EvalMVBPrecomputeInternal(ciphertext, coefficients, digitBitSize, initialScaling, order),
+                                coefficients, digitBitSize, order),
+                            postScaling, levelToReduce);
+    }
+    else {
+        // Andreea: uncomment when StC done before ModRaise
+        // uint32_t slots = ciphertext->GetSlots();
+        // auto& p = GetBootPrecom(slots);
+        // levelToReduce     = ciphertext->GetElements()[0].GetNumOfElements() - p.m_paramsDec[CKKS_BOOT_PARAMS::LEVEL_BUDGET] - 1; // Andreea: -2 with AdjustCiphertext 
+        // std::cerr << "levelToReduce = " << levelToReduce << std::endl;
+        return EvalLUTInternal(EvalHomEncoding(EvalHomDecoding(ciphertext, 1, levelToReduce), coefficients, digitBitSize, initialScaling, order), coefficients, digitBitSize, postScaling, order);
+    }
 }
 Ciphertext<DCRTPoly> FHECKKSRNS::EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
                                          const std::vector<int64_t>& coefficients, uint32_t digitBitSize,
                                          const BigInteger& initialScaling, uint64_t postScaling, uint32_t levelToReduce,
-                                         size_t order) {
-    return EvalHomDecoding(EvalMVBNoDecodingInternal(
-                               EvalMVBPrecomputeInternal(ciphertext, coefficients, digitBitSize, initialScaling, order),
-                               coefficients, digitBitSize, order),
-                           postScaling, levelToReduce);
+                                         size_t order, bool pureCKKS) {
+    if (!pureCKKS) {
+        return EvalHomDecoding(EvalMVBNoDecodingInternal(
+                                EvalMVBPrecomputeInternal(ciphertext, coefficients, digitBitSize, initialScaling, order),
+                                coefficients, digitBitSize, order),
+                            postScaling, levelToReduce);
+    }
+    else {
+        // Andreea: uncomment when StC done before ModRaise
+        // uint32_t slots = ciphertext->GetSlots();
+        // auto& p = GetBootPrecom(slots);
+        // levelToReduce     = p.m_paramsDec[CKKS_BOOT_PARAMS::LEVEL_BUDGET]; 
+        // std::cerr << "levelToReduce = " << levelToReduce << std::endl;        
+        return EvalLUTInternal(EvalHomEncoding(EvalHomDecoding(ciphertext, 1, levelToReduce), coefficients, digitBitSize, initialScaling, order), coefficients, digitBitSize, postScaling, order);
+    }
 }
 
 Ciphertext<DCRTPoly> FHECKKSRNS::EvalFBTNoDecoding(ConstCiphertext<DCRTPoly>& ciphertext,
