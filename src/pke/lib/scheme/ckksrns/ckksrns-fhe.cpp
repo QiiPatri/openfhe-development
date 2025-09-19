@@ -2721,7 +2721,7 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalHomDecoding(ConstCiphertext<DCRTPoly>& ciph
 
     // Drop levels if needed
 
-    // Andreea: In pure CKKS, so StC is done first, we need to drop all levels except lvl[1].
+    // In pure CKKS, so when StC is done first, we need to drop all levels except lvl[1].
     // When StC is done at the end of FBT, then levelToReduce can specify a number of levels to drop due to
     // intermediate computations.
     // Based on the flag in EvalFBT, we set the levelToReduce accordingly.
@@ -2771,7 +2771,7 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalHomDecoding(ConstCiphertext<DCRTPoly>& ciph
 template <typename VectorDataType>
 std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
     ConstCiphertext<DCRTPoly>& ciphertext, const std::vector<VectorDataType>& coefficients, uint32_t digitBitSize,
-    const BigInteger& initialScaling, size_t order) {
+    const BigInteger& initialScaling, size_t order, bool complexPacking) {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ciphertext->GetCryptoParameters());
     if (cryptoParams->GetScalingTechnique() == FLEXIBLEAUTO || cryptoParams->GetScalingTechnique() == FLEXIBLEAUTOEXT)
         OPENFHE_THROW("CKKS Functional Bootstrapping is supported for FIXEDMANUAL and FIXEDAUTO methods only.");
@@ -2781,13 +2781,6 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
     auto cc = ciphertext->GetCryptoContext();
     auto M  = cc->GetCyclotomicOrder();
     auto N  = cc->GetRingDimension();
-
-    // // We don't need the type of scaling and correction as in the standard CKKS bootstrapping
-    // // because the message doesn't have to be scaled down.
-    // // Instead, we need to correct the encoding if it originates from a different ciphertext
-    // // (not typical CKKS).
-    // double correction = cryptoParams->GetScalingFactorRealBig(0) / initialScaling.ConvertToDouble();
-    // std::cerr << "correction: " << correction << std::endl;
 
     //------------------------------------------------------------------------------
     // RAISING THE MODULUS
@@ -2859,7 +2852,6 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
     double k = (skd == SPARSE_TERNARY || skd == SPARSE_ENCAPSULATED) ? 1.0 : K_UNIFORM;
 
     double constantEvalMult = 1.0 / (k * N);
-    // double constantEvalMult = pre / (k * N);
     cc->EvalMultInPlace(raised, constantEvalMult);
 
     std::cerr << "raise level: " << raised->GetLevel() << ", depth: " << raised->GetNoiseScaleDeg() << std::endl;
@@ -2875,9 +2867,10 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
     std::vector<Ciphertext<DCRTPoly>> ctxtEnc;
     std::shared_ptr<seriesPowers<DCRTPoly>> ctxtPowers;
 
-    if (slots == M / 4) {
+    // Andreea: For digitBitSize = 1 and order = 1, we might be able to use a single ciphertext, because the coefficients are real. Not yet implemented.
+    if (slots == M / 4 && complexPacking) {
         //------------------------------------------------------------------------------
-        // FULLY PACKED CASE
+        // FULLY PACKED CASE WITH COMPLEX PACKING
         //------------------------------------------------------------------------------
 
         //------------------------------------------------------------------------------
@@ -2920,8 +2913,7 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
             auto& coeff_cos = (skd == SPARSE_ENCAPSULATED) ? coeff_cos_16_double : coeff_cos_25_double;
 
             ctxtEnc[0] = cc->EvalChebyshevSeries(ctxtEnc[0], coeff_cos, coeffLowerBound, coeffUpperBound);
-            // Andreea: we need a flag for full complex packing as opposed to full real packing
-            // ctxtEnc[1] = cc->EvalChebyshevSeries(ctxtEnc[1], coeff_cos, coeffLowerBound, coeffUpperBound);
+            ctxtEnc[1] = cc->EvalChebyshevSeries(ctxtEnc[1], coeff_cos, coeffLowerBound, coeffUpperBound);
 
             std::cerr << "ctxtEnc[0] after Cheby level: " << ctxtEnc[0]->GetLevel()
                       << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
@@ -2931,15 +2923,15 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
             cc->EvalAddInPlaceNoCheck(ctxtEnc[0], ctxtEnc[0]);
             cc->EvalSubInPlace(ctxtEnc[0], 1.0);
             cc->ModReduceInPlace(ctxtEnc[0]);  // cos(pi x)
-            // cc->EvalSquareInPlace(ctxtEnc[1]);
-            // cc->EvalAddInPlaceNoCheck(ctxtEnc[1], ctxtEnc[1]);
-            // cc->EvalSubInPlace(ctxtEnc[1], 1.0);
-            // cc->ModReduceInPlace(ctxtEnc[1]);  // cos(pi x)
+            cc->EvalSquareInPlace(ctxtEnc[1]);
+            cc->EvalAddInPlaceNoCheck(ctxtEnc[1], ctxtEnc[1]);
+            cc->EvalSubInPlace(ctxtEnc[1], 1.0);
+            cc->ModReduceInPlace(ctxtEnc[1]);  // cos(pi x)
 
             cc->EvalSquareInPlace(ctxtEnc[0]);
             cc->ModReduceInPlace(ctxtEnc[0]);  // cos^2(pi x)
-            // cc->EvalSquareInPlace(ctxtEnc[1]);
-            // cc->ModReduceInPlace(ctxtEnc[1]);  // cos^2(pi x)
+            cc->EvalSquareInPlace(ctxtEnc[1]);
+            cc->ModReduceInPlace(ctxtEnc[1]);  // cos^2(pi x)
 
             std::cerr << "ctxtEnc[0] level after double angle: " << ctxtEnc[0]->GetLevel()
                       << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
@@ -2951,7 +2943,7 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
 
             // Obtain exp(Pi/2*i*x) approximation via Chebyshev Basis Polynomial Interpolation
             ctxtEnc[0] = cc->EvalChebyshevSeries(ctxtEnc[0], coeff_exp, coeffLowerBound, coeffUpperBound);
-            // ctxtEnc[1] = cc->EvalChebyshevSeries(ctxtEnc[1], coeff_exp, coeffLowerBound, coeffUpperBound);
+            ctxtEnc[1] = cc->EvalChebyshevSeries(ctxtEnc[1], coeff_exp, coeffLowerBound, coeffUpperBound);
 
             std::cerr << "ctxtEnc[0] after Cheby level: " << ctxtEnc[0]->GetLevel()
                       << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
@@ -2962,36 +2954,42 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
             cc->EvalSquareInPlace(ctxtEnc[0]);
             cc->ModReduceInPlace(ctxtEnc[0]);
 
-            // cc->EvalSquareInPlace(ctxtEnc[1]);
-            // cc->ModReduceInPlace(ctxtEnc[1]);
-            // cc->EvalSquareInPlace(ctxtEnc[1]);
-            // cc->ModReduceInPlace(ctxtEnc[1]);
+            cc->EvalSquareInPlace(ctxtEnc[1]);
+            cc->ModReduceInPlace(ctxtEnc[1]);
+            cc->EvalSquareInPlace(ctxtEnc[1]);
+            cc->ModReduceInPlace(ctxtEnc[1]);
             std::cerr << "ctxtEnc[0] level after double angle: " << ctxtEnc[0]->GetLevel()
                       << ", depth: " << ctxtEnc[0]->GetNoiseScaleDeg() << std::endl;
         }
 
-        ctxtPowers = cc->EvalPowers(ctxtEnc[0], coefficients);
-        // auto ctxtPowersIm = cc->EvalPowers(ctxtEnc[1], coefficients);
-        // if (ctxtPowersRe->powers2Re.size() == 0) {
-        //     ctxtPowers = std::make_shared<seriesPowers<DCRTPoly>>(ctxtPowersRe->powersRe, ctxtPowersIm->powersRe);
-        // }
-        // else {
-        //     ctxtPowers = std::make_shared<seriesPowers<DCRTPoly>>(
-        //         ctxtPowersRe->powersRe, ctxtPowersRe->powers2Re, ctxtPowersRe->power2km1Re, ctxtPowersRe->k,
-        //         ctxtPowersRe->m, ctxtPowersIm->powersRe, ctxtPowersIm->powers2Re, ctxtPowersIm->power2km1Re);
-        // }
+        auto ctxtPowersRe = cc->EvalPowers(ctxtEnc[0], coefficients);
+        auto ctxtPowersIm = cc->EvalPowers(ctxtEnc[1], coefficients);
+        if (ctxtPowersRe->powers2Re.size() == 0) {
+            ctxtPowers = std::make_shared<seriesPowers<DCRTPoly>>(ctxtPowersRe->powersRe, ctxtPowersIm->powersRe);
+        }
+        else {
+            ctxtPowers = std::make_shared<seriesPowers<DCRTPoly>>(
+                ctxtPowersRe->powersRe, ctxtPowersRe->powers2Re, ctxtPowersRe->power2km1Re, ctxtPowersRe->k,
+                ctxtPowersRe->m, ctxtPowersIm->powersRe, ctxtPowersIm->powers2Re, ctxtPowersIm->power2km1Re);
+        }
     }
     else {
         //------------------------------------------------------------------------------
-        // SPARSELY PACKED CASE
+        // FULLY PACKED CASE REAL PACKING AND SPARSELY PACKED CASE
         //------------------------------------------------------------------------------
 
-        //------------------------------------------------------------------------------
-        // Running PartialSum
-        //------------------------------------------------------------------------------
+        if (complexPacking) {
+            OPENFHE_THROW("Complex packing is only supported for the fully packed case.");
+        }
 
-        for (uint32_t j = 1; j < N / (2 * slots); j <<= 1)
-            cc->EvalAddInPlaceNoCheck(raised, cc->EvalRotate(raised, j * slots));
+        if (slots < M / 4) {
+            //------------------------------------------------------------------------------
+            // Running PartialSum
+            //------------------------------------------------------------------------------
+
+            for (uint32_t j = 1; j < N / (2 * slots); j <<= 1)
+                cc->EvalAddInPlaceNoCheck(raised, cc->EvalRotate(raised, j * slots));
+        }
 
         //------------------------------------------------------------------------------
         // Running CoeffsToSlots
@@ -3067,14 +3065,15 @@ std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncodingInternal(
 
 std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncoding(
     ConstCiphertext<DCRTPoly>& ciphertext, const std::vector<std::complex<double>>& coefficients, uint32_t digitBitSize,
-    const BigInteger& initialScaling, size_t order) {
-    return EvalHomEncodingInternal(ciphertext, coefficients, digitBitSize, initialScaling, order);
+    const BigInteger& initialScaling, size_t order, bool complexPacking) {
+    return EvalHomEncodingInternal(ciphertext, coefficients, digitBitSize, initialScaling, order, complexPacking);
 }
 std::shared_ptr<seriesPowers<DCRTPoly>> FHECKKSRNS::EvalHomEncoding(ConstCiphertext<DCRTPoly>& ciphertext,
                                                                     const std::vector<int64_t>& coefficients,
                                                                     uint32_t digitBitSize,
-                                                                    const BigInteger& initialScaling, size_t order) {
-    return EvalHomEncodingInternal(ciphertext, coefficients, digitBitSize, initialScaling, order);
+                                                                    const BigInteger& initialScaling, size_t order,
+                                                                    bool complexPacking) {
+    return EvalHomEncodingInternal(ciphertext, coefficients, digitBitSize, initialScaling, order, complexPacking);
 }
 
 template <typename VectorDataType>
@@ -3489,7 +3488,7 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalMVBNoDecodingInternal(const std::shared_ptr
 template <typename VectorDataType>
 Ciphertext<DCRTPoly> FHECKKSRNS::EvalLUTInternal(const std::shared_ptr<seriesPowers<DCRTPoly>> ciphertexts,
                                                  const std::vector<VectorDataType>& coefficients, uint32_t digitBitSize,
-                                                 uint64_t postScaling, size_t order) {
+                                                 uint64_t postScaling, size_t order, bool complexPacking) {
     std::cerr << "EvalLUT" << std::endl;
     std::cerr << ciphertexts->powersRe.size() << " powers in the real part and " << ciphertexts->powersIm.size()
               << " powers in the imaginary part." << std::endl;
@@ -3507,62 +3506,65 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalLUTInternal(const std::shared_ptr<seriesPow
 
     Ciphertext<DCRTPoly> ctxtEnc;
 
-    if (slots == M / 4) {
+    // Andreea: For digitBitSize = 1 and order = 1, we might be able to use a single ciphertext, because the coefficients are real. Not yet implemented.
+
+    if (slots == M / 4 && complexPacking) {
         //------------------------------------------------------------------------------
         // FULLY PACKED CASE
         //------------------------------------------------------------------------------
-        // if (ciphertexts->powersIm.size() == 0)
-        //     OPENFHE_THROW("Full packing requires powers for both the real and imaginary parts.");
-        // Ciphertext<DCRTPoly> ctxtEncI;
+        if (ciphertexts->powersIm.size() == 0)
+            OPENFHE_THROW("Full packing requires powers for both the real and imaginary parts.");
+        Ciphertext<DCRTPoly> ctxtEncI;
 
         //------------------------------------------------------------------------------
         // Running Approximate Mod Reduction using the complex explonential
         //------------------------------------------------------------------------------
 
         if (digitBitSize == 1 && order == 1) {
-            ctxtEnc = ciphertexts->powersRe[0];
-            // ctxtEncI = ciphertexts->powersIm[0];
+            ctxtEnc  = ciphertexts->powersRe[0];
+            ctxtEncI = ciphertexts->powersIm[0];
             // Assumes the function is integer and real!
             if (ToReal(coefficients[1]) > 0) {  // MultByInteger only works with positive integers
                 algo->MultByIntegerInPlace(ctxtEnc, ToReal(coefficients[1]));
                 cc->EvalAddInPlace(ctxtEnc, ToReal(coefficients[0]));
-                // algo->MultByIntegerInPlace(ctxtEncI, ToReal(coefficients[1]));
-                // cc->EvalAddInPlace(ctxtEncI, ToReal(coefficients[0]));
+                algo->MultByIntegerInPlace(ctxtEncI, ToReal(coefficients[1]));
+                cc->EvalAddInPlace(ctxtEncI, ToReal(coefficients[0]));
             }
             else {
                 algo->MultByIntegerInPlace(ctxtEnc, -ToReal(coefficients[1]));
                 ctxtEnc = cc->EvalSub(ToReal(coefficients[0]), ctxtEnc);
-                // algo->MultByIntegerInPlace(ctxtEncI, -ToReal(coefficients[1]));
-                // ctxtEncI = cc->EvalSub(ToReal(coefficients[0]), ctxtEncI);
+                algo->MultByIntegerInPlace(ctxtEncI, -ToReal(coefficients[1]));
+                ctxtEncI = cc->EvalSub(ToReal(coefficients[0]), ctxtEncI);
             }
         }
         else {
             // Obtain the complex Hermite Trigonometric Interpolation via Power Basis Polynomial Interpolation
             // Coefficients are divided by 2
-            std::shared_ptr<seriesPowers<DCRTPoly>> ctxtPowersRe;  //, ctxtPowersIm;
+            std::shared_ptr<seriesPowers<DCRTPoly>> ctxtPowersRe, ctxtPowersIm;
             if (ciphertexts->powers2Re.size() == 0) {
                 ctxtPowersRe = std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersRe);
-                // ctxtPowersIm = std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersIm);
+                ctxtPowersIm = std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersIm);
             }
             else {
                 ctxtPowersRe =
                     std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersRe, ciphertexts->powers2Re,
                                                              ciphertexts->power2km1Re, ciphertexts->k, ciphertexts->m);
-                // ctxtPowersIm =
-                //     std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersIm, ciphertexts->powers2Im,
-                //                                              ciphertexts->power2km1Im, ciphertexts->k, ciphertexts->m);
+                ctxtPowersIm =
+                    std::make_shared<seriesPowers<DCRTPoly>>(ciphertexts->powersIm, ciphertexts->powers2Im,
+                                                             ciphertexts->power2km1Im, ciphertexts->k, ciphertexts->m);
             }
 
             // Take the real part
             // Division by 2 was already performed
             ctxtEnc = cc->EvalPolyWithPrecomp(ctxtPowersRe, coefficients);
             cc->EvalAddInPlaceNoCheck(ctxtEnc, Conjugate(ctxtEnc, cc->GetEvalAutomorphismKeyMap(ctxtEnc->GetKeyTag())));
-            // ctxtEncI = cc->EvalPolyWithPrecomp(ctxtPowersIm, coefficients);
-            // cc->EvalAddInPlaceNoCheck(ctxtEncI, Conjugate(ctxtEncI, cc->GetEvalAutomorphismKeyMap(ctxtEnc->GetKeyTag())));
+            ctxtEncI = cc->EvalPolyWithPrecomp(ctxtPowersIm, coefficients);
+            cc->EvalAddInPlaceNoCheck(ctxtEncI,
+                                      Conjugate(ctxtEncI, cc->GetEvalAutomorphismKeyMap(ctxtEnc->GetKeyTag())));
         }
 
-        // algo->MultByMonomialInPlace(ctxtEncI, M / 4);
-        // cc->EvalAddInPlaceNoCheck(ctxtEnc, ctxtEncI);
+        algo->MultByMonomialInPlace(ctxtEncI, M / 4);
+        cc->EvalAddInPlaceNoCheck(ctxtEnc, ctxtEncI);
         // No need to scale the message back up after Chebyshev interpolation
     }
     else {
@@ -3618,7 +3620,7 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalLUTInternal(const std::shared_ptr<seriesPow
 Ciphertext<DCRTPoly> FHECKKSRNS::EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
                                          const std::vector<std::complex<double>>& coefficients, uint32_t digitBitSize,
                                          const BigInteger& initialScaling, uint64_t postScaling, uint32_t levelToReduce,
-                                         size_t order, bool pureCKKS) {
+                                         size_t order, bool pureCKKS, bool complexPacking) {
     if (!pureCKKS) {
         return EvalHomDecoding(EvalMVBNoDecodingInternal(EvalMVBPrecomputeInternal(ciphertext, coefficients,
                                                                                    digitBitSize, initialScaling, order),
@@ -3632,14 +3634,14 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
             ciphertext->GetElements()[0].GetNumOfElements() - p.m_paramsDec[CKKS_BOOT_PARAMS::LEVEL_BUDGET] - 1;
         std::cerr << "levelToReduce = " << levelToReduce << std::endl;
         return EvalLUTInternal(EvalHomEncoding(EvalHomDecoding(ciphertext, 1, levelToReduce), coefficients,
-                                               digitBitSize, initialScaling, order),
-                               coefficients, digitBitSize, postScaling, order);
+                                               digitBitSize, initialScaling, order, complexPacking),
+                               coefficients, digitBitSize, postScaling, order, complexPacking);
     }
 }
 Ciphertext<DCRTPoly> FHECKKSRNS::EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
                                          const std::vector<int64_t>& coefficients, uint32_t digitBitSize,
                                          const BigInteger& initialScaling, uint64_t postScaling, uint32_t levelToReduce,
-                                         size_t order, bool pureCKKS) {
+                                         size_t order, bool pureCKKS, bool complexPacking) {
     if (!pureCKKS) {
         return EvalHomDecoding(EvalMVBNoDecodingInternal(EvalMVBPrecomputeInternal(ciphertext, coefficients,
                                                                                    digitBitSize, initialScaling, order),
@@ -3653,8 +3655,8 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
             ciphertext->GetElements()[0].GetNumOfElements() - p.m_paramsDec[CKKS_BOOT_PARAMS::LEVEL_BUDGET] - 1;
         std::cerr << "levelToReduce = " << levelToReduce << std::endl;
         return EvalLUTInternal(EvalHomEncoding(EvalHomDecoding(ciphertext, 1, levelToReduce), coefficients,
-                                               digitBitSize, initialScaling, order),
-                               coefficients, digitBitSize, postScaling, order);
+                                               digitBitSize, initialScaling, order, complexPacking),
+                               coefficients, digitBitSize, postScaling, order, complexPacking);
     }
 }
 

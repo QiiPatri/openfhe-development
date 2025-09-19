@@ -1176,9 +1176,11 @@ public:
     template <typename VectorDataType>
     Ciphertext<Element> EvalFBT(ConstCiphertext<Element>& ciphertext, const std::vector<VectorDataType>& coeffs,
                                 uint32_t digitBitSize, const BigInteger& initialScaling, uint64_t postScaling,
-                                uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false) {
+                                uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false,
+                                bool complexPacking = false) {
         VerifyFHEEnabled(__func__);
-        return m_FHE->EvalFBT(ciphertext, coeffs, digitBitSize, initialScaling, postScaling, levelToReduce, order, pureCKKS);
+        return m_FHE->EvalFBT(ciphertext, coeffs, digitBitSize, initialScaling, postScaling, levelToReduce, order,
+                              pureCKKS, complexPacking);
     }
 
     template <typename VectorDataType>
@@ -1197,11 +1199,11 @@ public:
 
     template <typename VectorDataType>
     std::shared_ptr<seriesPowers<Element>> EvalHomEncoding(ConstCiphertext<Element>& ciphertext,
-                                                             const std::vector<VectorDataType>& coeffs,
-                                                             uint32_t digitBitSize, const BigInteger& initialScaling,
-                                                             size_t order = 1) {
+                                                           const std::vector<VectorDataType>& coeffs,
+                                                           uint32_t digitBitSize, const BigInteger& initialScaling,
+                                                           size_t order = 1, bool complexPacking = false) {
         VerifyFHEEnabled(__func__);
-        return m_FHE->EvalHomEncoding(ciphertext, coeffs, digitBitSize, initialScaling, order);
+        return m_FHE->EvalHomEncoding(ciphertext, coeffs, digitBitSize, initialScaling, order, complexPacking);
     }
 
     template <typename VectorDataType>

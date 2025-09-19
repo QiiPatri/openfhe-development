@@ -97,13 +97,13 @@ int main() {
     /*====Discrete CKKS Functional Bootstrapping====*/
 
     /* Function */
-    BigInteger PInput(256);  // Andreea: type on integer instead of big integer for CKKS only?
-    BigInteger POutput(2);
+    BigInteger PInput(128);
+    BigInteger POutput(128);
     uint32_t dcrtBits = 50;
     BigInteger Bigq(1UL << dcrtBits);
     uint32_t order = 1;
     // scaleTHI HAS to be 1 for PInput = 2. Andreea: hardcode this.
-    double scaleTHI = 1;  // 16.;
+    double scaleTHI = 16;
 
     auto a    = PInput.ConvertToInt<int64_t>();
     auto b    = POutput.ConvertToInt<int64_t>();
@@ -125,15 +125,15 @@ int main() {
         coeffcomp = GetHermiteTrigCoefficients(func, a, order, scaleTHI);  // divided by 2
     }
 
-    uint32_t ringDim            = 32;
-    uint32_t numSlots           = 16;
+    uint32_t ringDim            = 128;
+    uint32_t numSlots           = 64;
     uint32_t firstMod           = 50;
     uint32_t dnum               = 3;
     SecretKeyDist secretKeyDist = SPARSE_ENCAPSULATED;
     std::vector<uint32_t> lvlb  = {
-        3, 3};  // Andreea: note the different order in the lvlb, we do first StC but it is on position [1]
+        3, 3};  // Note the different order in the lvlb, we do first StC but it is on position [1]
     // We need at least 1 level after bootstrap to be able to correctly decrypt for non-boolean messages, and more levels if we want to support subsequent FBTs
-    uint32_t levelsAvailableAfterBootstrap = 1;  //  std::min(static_cast<uint32_t>(1), lvlb[1] + 1);
+    uint32_t levelsAvailableAfterBootstrap = 1;  //  lvlb[1] + 1;
 
     CCParams<CryptoContextCKKSRNS> parameters;
     parameters.SetSecretKeyDist(secretKeyDist);
@@ -144,6 +144,7 @@ int main() {
     parameters.SetNumLargeDigits(dnum);
     parameters.SetBatchSize(numSlots);
     parameters.SetRingDim(ringDim);
+    parameters.SetCKKSDataType(COMPLEX);
     uint32_t depth = levelsAvailableAfterBootstrap + lvlb[0] + 2;
 
     if (binaryLUT)
@@ -182,14 +183,28 @@ int main() {
     cc->EvalMultKeyGen(keyPair.secretKey);
 
     /* Input */
-    std::vector<double> x = {PInput.ConvertToDouble() / 2 - 1, PInput.ConvertToDouble() / 2 + 1, 5, 4, 3, 2, 1, 0};
+    // std::vector<double> x = {PInput.ConvertToDouble() / 2 - 1, PInput.ConvertToDouble() / 2 + 1, 5, 4, 3, 2, 1, 0};
+    // std::cerr << "First elements of the input (repeated) up to size " << numSlots << ":" << std::endl;
+    // std::cerr << x << std::endl;
+    // if (x.size() < numSlots)
+    //     x = Fill<double>(x, numSlots);
+
+    std::vector<std::complex<double>> x = {PInput.ConvertToDouble() / 2 - 1,
+                                           PInput.ConvertToDouble() / 2 + 1 + 1i,
+                                           5. + 2i,
+                                           4. + 3i,
+                                           3. + 4i,
+                                           2. + 5i,
+                                           1. + (PInput.ConvertToDouble() / 2 + 1) * 1i,
+                                           0. + (PInput.ConvertToDouble() / 2 - 1) * 1.i};
     std::cerr << "First elements of the input (repeated) up to size " << numSlots << ":" << std::endl;
     std::cerr << x << std::endl;
     if (x.size() < numSlots)
-        x = Fill<double>(x, numSlots);
+        x = Fill<std::complex<double>>(x, numSlots);
 
-    auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, 0, nullptr, numSlots);  // Andreea: reduce levels before HomDecoding
-    // auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, depth - lvlb[1], nullptr, numSlots); // -1 for correction in AdjustCiphertext
+    auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, 0, nullptr,
+                                            numSlots);  // Levels are reduced automatically before EvalHomDecoding
+    // auto ptxt = cc->MakeCKKSPackedPlaintext(x, 1, depth - lvlb[1], nullptr, numSlots);
     auto ctxt = cc->Encrypt(keyPair.publicKey, ptxt);
 
     std::cerr << "#levels of ctxt: " << ctxt->GetLevel() << ", depth = " << ctxt->GetNoiseScaleDeg() << std::endl;
@@ -198,11 +213,13 @@ int main() {
     */
     Ciphertext<DCRTPoly> ctxtAfterFBT;
     if (binaryLUT)
-        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffint, PInput.GetMSB() - 1,
-                                   ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
+        ctxtAfterFBT =
+            cc->EvalFBT(ctxt, coeffint, PInput.GetMSB() - 1, ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(),
+                        scaleTHI, 0, order, true, true);
     else
-        ctxtAfterFBT = cc->EvalFBT(ctxt, coeffcomp, PInput.GetMSB() - 1,
-                                   ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(), scaleTHI, 0, order, true);
+        ctxtAfterFBT =
+            cc->EvalFBT(ctxt, coeffcomp, PInput.GetMSB() - 1, ptxt->GetElement<DCRTPoly>().GetParams()->GetModulus(),
+                        scaleTHI, 0, order, true, true);
 
     std::cerr << "#levels of ctxtAfterFBT: " << ctxtAfterFBT->GetLevel()
               << ", depth = " << ctxtAfterFBT->GetNoiseScaleDeg() << std::endl;
@@ -213,25 +230,31 @@ int main() {
     std::cerr << "Result after FBT: " << result << std::endl;
 
     auto exact(x);
-    std::transform(x.begin(), x.end(), exact.begin(),
-                   [&](const double& elem) { return func(static_cast<int64_t>(elem)); });
 
     // std::transform(x.begin(), x.end(), exact.begin(), [&](const double& elem) {
-    //     return (func(static_cast<int64_t>(elem)) > POutput.ConvertToDouble() / 2.) ? func(static_cast<int64_t>(elem)) - POutput.ConvertToDouble() : func(static_cast<int64_t>(elem));
+    //     return func(static_cast<int64_t>(elem));
     // });
+
+    std::transform(x.begin(), x.end(), exact.begin(), [&](const std::complex<double>& elem) {
+        return static_cast<double>(func(static_cast<int64_t>(elem.real()))) +
+               static_cast<double>(func(static_cast<int64_t>(elem.imag()))) * 1.i;
+    });
+
     std::cerr << "exact: " << exact << std::endl;
 
-    auto computed = result->GetRealPackedValue();
-
-    std::transform(exact.begin(), exact.end(), computed.begin(), exact.begin(), std::minus<double>());
+    // auto computed = result->GetRealPackedValue();
+    // std::transform(exact.begin(), exact.end(), computed.begin(), exact.begin(), std::minus<double>());
     // std::transform(exact.begin(), exact.end(), exact.begin(),
-    //                [&](const int64_t& elem) { return (std::abs(elem)) % (POutput.ConvertToInt()); });
+    //                [&](const int64_t& elem) { return std::abs(elem); });
+    // auto max_error_it = std::max_element(exact.begin(), exact.end());
 
-    std::transform(exact.begin(), exact.end(), exact.begin(), [&](const int64_t& elem) { return std::abs(elem); });
+    auto computed = result->GetCKKSPackedValue();
+    std::transform(exact.begin(), exact.end(), computed.begin(), exact.begin(), std::minus<std::complex<double>>());
+    std::vector<double> errorReal(exact.size());
+    std::transform(exact.begin(), exact.end(), errorReal.begin(),
+                   [&](const std::complex<double>& elem) { return std::abs(elem); });
+    auto max_error_it = std::max_element(errorReal.begin(), errorReal.end());
 
-    // std::cerr << "absolute error: " << exact << std::endl;
-
-    auto max_error_it = std::max_element(exact.begin(), exact.end());
     std::cerr << "Max absolute error obtained: " << *max_error_it << std::endl << std::endl;
 
     return 0;

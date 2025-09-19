@@ -172,10 +172,11 @@ public:
     Ciphertext<DCRTPoly> EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
                                  const std::vector<std::complex<double>>& coefficients, uint32_t digitBitSize,
                                  const BigInteger& initialScaling, uint64_t postScaling, uint32_t levelToReduce = 0,
-                                 size_t order = 1, bool pureCKKS = false) override;
+                                 size_t order = 1, bool pureCKKS = false, bool complexPacking = false) override;
     Ciphertext<DCRTPoly> EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext, const std::vector<int64_t>& coefficients,
                                  uint32_t digitBitSize, const BigInteger& initialScaling, uint64_t postScaling,
-                                 uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false) override;
+                                 uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false,
+                                 bool complexPacking = false) override;
 
     Ciphertext<DCRTPoly> EvalFBTNoDecoding(ConstCiphertext<DCRTPoly>& ciphertext,
                                            const std::vector<std::complex<double>>& coefficients, uint32_t digitBitSize,
@@ -188,13 +189,13 @@ public:
                                          uint32_t levelToReduce = 0) override;
 
     std::shared_ptr<seriesPowers<DCRTPoly>> EvalHomEncoding(ConstCiphertext<DCRTPoly>& ciphertext,
-                                                              const std::vector<std::complex<double>>& coeffs,
-                                                              uint32_t digitBitSize, const BigInteger& initialScaling,
-                                                              size_t order = 1) override;
+                                                            const std::vector<std::complex<double>>& coeffs,
+                                                            uint32_t digitBitSize, const BigInteger& initialScaling,
+                                                            size_t order = 1, bool complexPacking = false) override;
     std::shared_ptr<seriesPowers<DCRTPoly>> EvalHomEncoding(ConstCiphertext<DCRTPoly>& ciphertext,
-                                                              const std::vector<int64_t>& coeffs, uint32_t digitBitSize,
-                                                              const BigInteger& initialScaling,
-                                                              size_t order = 1) override;
+                                                            const std::vector<int64_t>& coeffs, uint32_t digitBitSize,
+                                                            const BigInteger& initialScaling, size_t order = 1,
+                                                            bool complexPacking = false) override;
     std::shared_ptr<seriesPowers<DCRTPoly>> EvalMVBPrecompute(ConstCiphertext<DCRTPoly>& ciphertext,
                                                               const std::vector<std::complex<double>>& coeffs,
                                                               uint32_t digitBitSize, const BigInteger& initialScaling,
@@ -396,18 +397,18 @@ private:
                                                                       uint32_t digitBitSize,
                                                                       const BigInteger& initialScaling,
                                                                       size_t order = 1);
-                                                                    
+
     template <typename VectorDataType>
     std::shared_ptr<seriesPowers<DCRTPoly>> EvalHomEncodingInternal(ConstCiphertext<DCRTPoly>& ciphertext,
-                                                                      const std::vector<VectorDataType>& coefficients,
-                                                                      uint32_t digitBitSize,
-                                                                      const BigInteger& initialScaling,
-                                                                      size_t order = 1);
+                                                                    const std::vector<VectorDataType>& coefficients,
+                                                                    uint32_t digitBitSize,
+                                                                    const BigInteger& initialScaling, size_t order = 1,
+                                                                    bool complexPacking = false);
 
     template <typename VectorDataType>
     Ciphertext<DCRTPoly> EvalLUTInternal(std::shared_ptr<seriesPowers<DCRTPoly>> ciphertext,
-                                                   const std::vector<VectorDataType>& coefficients,
-                                                   uint32_t digitBitSize, uint64_t postScaling = 1, size_t order = 1);
+                                         const std::vector<VectorDataType>& coefficients, uint32_t digitBitSize,
+                                         uint64_t postScaling = 1, size_t order = 1, bool complexPacking = false);
 
     template <typename VectorDataType>
     Ciphertext<DCRTPoly> EvalMVBNoDecodingInternal(std::shared_ptr<seriesPowers<DCRTPoly>> ciphertext,

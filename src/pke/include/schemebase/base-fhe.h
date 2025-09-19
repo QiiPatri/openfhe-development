@@ -148,12 +148,14 @@ public:
     virtual Ciphertext<Element> EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext,
                                         const std::vector<std::complex<double>>& coeffs, uint32_t digitBitSize,
                                         const BigInteger& initialScaling, uint64_t postScaling,
-                                        uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false) {
+                                        uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false,
+                                        bool complexPacking = false) {
         OPENFHE_THROW("Not supported");
     }
     virtual Ciphertext<Element> EvalFBT(ConstCiphertext<DCRTPoly>& ciphertext, const std::vector<int64_t>& coeffs,
                                         uint32_t digitBitSize, const BigInteger& initialScaling, uint64_t postScaling,
-                                        uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false) {
+                                        uint32_t levelToReduce = 0, size_t order = 1, bool pureCKKS = false,
+                                        bool complexPacking = false) {
         OPENFHE_THROW("Not supported");
     }
 
@@ -175,18 +177,18 @@ public:
     }
 
     virtual std::shared_ptr<seriesPowers<DCRTPoly>> EvalHomEncoding(ConstCiphertext<DCRTPoly>& ciphertext,
-                                                                      const std::vector<std::complex<double>>& coeffs,
-                                                                      uint32_t digitBitSize,
-                                                                      const BigInteger& initialScaling,
-                                                                      size_t order = 1) {
+                                                                    const std::vector<std::complex<double>>& coeffs,
+                                                                    uint32_t digitBitSize,
+                                                                    const BigInteger& initialScaling, size_t order = 1,
+                                                                    bool complexPacking = false) {
         OPENFHE_THROW("Not supported");
     }
 
     virtual std::shared_ptr<seriesPowers<DCRTPoly>> EvalHomEncoding(ConstCiphertext<DCRTPoly>& ciphertext,
-                                                                      const std::vector<int64_t>& coeffs,
-                                                                      uint32_t digitBitSize,
-                                                                      const BigInteger& initialScaling,
-                                                                      size_t order = 1) {
+                                                                    const std::vector<int64_t>& coeffs,
+                                                                    uint32_t digitBitSize,
+                                                                    const BigInteger& initialScaling, size_t order = 1,
+                                                                    bool complexPacking = false) {
         OPENFHE_THROW("Not supported");
     }
 
