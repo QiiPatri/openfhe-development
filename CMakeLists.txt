@@ -65,7 +65,7 @@ else()
     option(BUILD_UNITTESTS "Set to ON to build unit tests for the library"             ON  )
     option(BUILD_EXAMPLES "Set to ON to build examples for the library"                ON  )
     option(BUILD_BENCHMARKS "Set to ON to build benchmarks for the library"            ON  )
-    option(WITH_OPENMP "Use OpenMP to enable <omp.h>"                                  ON  )
+    option(WITH_OPENMP "Use OpenMP to enable <omp.h>"                                  OFF )
 endif()
 
 option(BUILD_EXTRAS "Set to ON to build extras for the library"                        OFF )

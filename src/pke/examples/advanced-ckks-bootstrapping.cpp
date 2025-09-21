@@ -38,6 +38,7 @@ Example for CKKS bootstrapping with sparse packing
 #define PROFILE
 
 #include "openfhe.h"
+#include "utils/debug.h"
 
 using namespace lbcrypto;
 
@@ -60,7 +61,7 @@ void BootstrapExample(uint32_t numSlots) {
     * but in this example, we use UNIFORM_TERNARY because this is included in the homomorphic
     * encryption standard.
     */
-    SecretKeyDist secretKeyDist = UNIFORM_TERNARY;
+    SecretKeyDist secretKeyDist = SPARSE_TERNARY;
     parameters.SetSecretKeyDist(secretKeyDist);
 
     /*  A2) Desired security level based on FHE standards.
@@ -73,14 +74,14 @@ void BootstrapExample(uint32_t numSlots) {
     * you do not need to set the ring dimension.
     */
     parameters.SetSecurityLevel(HEStd_NotSet);
-    parameters.SetRingDim(1 << 12);
+    parameters.SetRingDim(1 << 16);
 
     /*  A3) Key switching parameters.
     * By default, we use HYBRID key switching with a digit size of 3.
     * Choosing a larger digit size can reduce complexity, but the size of keys will increase.
     * Note that you can leave these lines of code out completely, since these are the default values.
     */
-    parameters.SetNumLargeDigits(3);
+    parameters.SetNumLargeDigits(4);
     parameters.SetKeySwitchTechnique(HYBRID);
 
     /*  A4) Scaling parameters.
@@ -96,8 +97,8 @@ void BootstrapExample(uint32_t numSlots) {
 #else
     // All modes are supported for 64-bit CKKS bootstrapping.
     ScalingTechnique rescaleTech = FLEXIBLEAUTO;
-    usint dcrtBits               = 59;
-    usint firstMod               = 60;
+    usint dcrtBits               = 49;
+    usint firstMod               = 50;
 #endif
 
     parameters.SetScalingModSize(dcrtBits);
@@ -128,9 +129,10 @@ void BootstrapExample(uint32_t numSlots) {
     * using GetBootstrapDepth, and add it to levelsAvailableAfterBootstrap to set our initial multiplicative
     * depth.
     */
-    uint32_t levelsAvailableAfterBootstrap = 10;
+    uint32_t levelsAvailableAfterBootstrap = 7;
     usint depth = levelsAvailableAfterBootstrap + FHECKKSRNS::GetBootstrapDepth(levelBudget, secretKeyDist);
     parameters.SetMultiplicativeDepth(depth);
+    
 
     // Generate crypto context.
     CryptoContext<DCRTPoly> cryptoContext = GenCryptoContext(parameters);
@@ -144,6 +146,59 @@ void BootstrapExample(uint32_t numSlots) {
 
     usint ringDim = cryptoContext->GetRingDimension();
     std::cout << "CKKS scheme is using ring dimension " << ringDim << std::endl << std::endl;
+
+    // 获取加密参数信息
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(cryptoContext->GetCryptoParameters());
+    const auto elementParams = cryptoParams->GetElementParams();
+    
+    // 打印环维度
+    std::cout << "CKKS scheme is using ring dimension " << cryptoContext->GetRingDimension() << std::endl;
+    
+    // 打印模数链长度（q的个数）
+    size_t numQ = elementParams->GetParams().size();
+    std::cout << "Number of moduli in ciphertext modulus chain (q): " << numQ << std::endl;
+    
+    // 打印所有q值
+    std::cout << "Moduli q values: " << std::endl;
+    for (size_t i = 0; i < numQ; i++) {
+        auto params = elementParams->GetParams();
+        std::cout << "q[" << i << "]: " << params[i]->GetModulus() << std::endl;
+    }
+    
+    // 尝试获取和打印所有p值
+    try {
+        // 获取特殊素数信息
+        const auto paramsP = cryptoParams->GetParamsP();
+        if (paramsP != nullptr) {
+            size_t numP = paramsP->GetParams().size();
+            std::cout << "\nNumber of special primes (p): " << numP << std::endl;
+            
+            // 打印所有p值
+            std::cout << "Special primes p values: " << std::endl;
+            for (size_t i = 0; i < numP; i++) {
+                auto paramP = paramsP->GetParams();
+                std::cout << "p[" << i << "]: " << paramP[i]->GetModulus() << std::endl;
+            }
+        } else {
+            std::cout << "\nNo special primes (p) are used in current configuration." << std::endl;
+        }
+        
+        // 打印辅助信息
+        std::cout << "\nKey switching technique: ";
+        switch (cryptoParams->GetKeySwitchTechnique()) {
+            case BV:
+                std::cout << "BV (no special primes)" << std::endl;
+                break;
+            case HYBRID:
+                std::cout << "HYBRID with " << cryptoParams->GetNumberOfQPartitions() << " partitions" << std::endl;
+                std::cout << "Alpha (towers per digit): " << cryptoParams->GetNumPerPartQ() << std::endl;
+                break;
+            default:
+                std::cout << "Unknown" << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cout << "\nCould not determine special primes: " << e.what() << std::endl;
+    }
 
     // Step 2: Precomputations for bootstrapping
     cryptoContext->EvalBootstrapSetup(levelBudget, bsgsDim, numSlots);
@@ -159,7 +214,7 @@ void BootstrapExample(uint32_t numSlots) {
     std::vector<double> x;
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0.0, 1.0);
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
     for (size_t i = 0; i < numSlots; i++) {
         x.push_back(dis(gen));
     }
@@ -182,7 +237,16 @@ void BootstrapExample(uint32_t numSlots) {
 
     // Step 5: Perform the bootstrapping operation. The goal is to increase the number of levels remaining
     // for HE computation.
+
+    // 为引导操作添加计时
+    TimeVar t;
+    double timeElapsed;
+    
+    std::cout << "Starting bootstrapping operation..." << std::endl;
+    TIC(t);
     auto ciphertextAfter = cryptoContext->EvalBootstrap(ciph);
+    timeElapsed = TOC(t);
+    std::cout << "Bootstrapping operation completed in " << timeElapsed << " ms" << std::endl;
 
     std::cout << "Number of levels remaining after bootstrapping: " << depth - ciphertextAfter->GetLevel() << std::endl
               << std::endl;

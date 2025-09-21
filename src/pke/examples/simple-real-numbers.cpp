@@ -36,6 +36,7 @@
 #define PROFILE
 
 #include "openfhe.h"
+#include "utils/debug.h"
 
 using namespace lbcrypto;
 
@@ -60,7 +61,7 @@ int main() {
    * For performance reasons, it's generally preferable to perform operations
    * in the shorted multiplicative depth possible.
    */
-    uint32_t multDepth = 1;
+    uint32_t multDepth = 22;
 
     /* A2) Bit-length of scaling factor.
    * CKKS works for real numbers, but these numbers are encoded as integers.
@@ -83,7 +84,7 @@ int main() {
    * scaling factor should be large enough to both accommodate this noise and
    * support results that match the desired accuracy.
    */
-    uint32_t scaleModSize = 50;
+    uint32_t scaleModSize = 49;
 
     /* A3) Number of plaintext slots used in the ciphertext.
    * CKKS packs multiple plaintext values in each ciphertext.
@@ -116,7 +117,11 @@ int main() {
    */
     CCParams<CryptoContextCKKSRNS> parameters;
     parameters.SetMultiplicativeDepth(multDepth);
+
     parameters.SetScalingModSize(scaleModSize);
+    parameters.SetSecurityLevel(HEStd_128_classic);
+    parameters.SetFirstModSize(50);
+    parameters.SetNumLargeDigits(4);
     parameters.SetBatchSize(batchSize);
 
     CryptoContext<DCRTPoly> cc = GenCryptoContext(parameters);
@@ -125,7 +130,63 @@ int main() {
     cc->Enable(PKE);
     cc->Enable(KEYSWITCH);
     cc->Enable(LEVELEDSHE);
-    std::cout << "CKKS scheme is using ring dimension " << cc->GetRingDimension() << std::endl << std::endl;
+
+    // 获取加密参数信息
+    const auto cryptoParams  = std::dynamic_pointer_cast<CryptoParametersRNS>(cc->GetCryptoParameters());
+    const auto elementParams = cryptoParams->GetElementParams();
+
+    // 打印环维度
+    std::cout << "CKKS scheme is using ring dimension " << cc->GetRingDimension() << std::endl;
+
+    // 打印模数链长度（q的个数）
+    size_t numQ = elementParams->GetParams().size();
+    std::cout << "Number of moduli in ciphertext modulus chain (q): " << numQ << std::endl;
+
+    // 打印所有q值
+    std::cout << "Moduli q values: " << std::endl;
+    for (size_t i = 0; i < numQ; i++) {
+        auto params = elementParams->GetParams();
+        std::cout << "q[" << i << "]: " << params[i]->GetModulus() << std::endl;
+    }
+
+    // 尝试获取和打印所有p值
+    try {
+        // 获取特殊素数信息
+        const auto paramsP = cryptoParams->GetParamsP();
+        if (paramsP != nullptr) {
+            size_t numP = paramsP->GetParams().size();
+            std::cout << "\nNumber of special primes (p): " << numP << std::endl;
+
+            // 打印所有p值
+            std::cout << "Special primes p values: " << std::endl;
+            for (size_t i = 0; i < numP; i++) {
+                auto paramP = paramsP->GetParams();
+                std::cout << "p[" << i << "]: " << paramP[i]->GetModulus() << std::endl;
+            }
+        }
+        else {
+            std::cout << "\nNo special primes (p) are used in current configuration." << std::endl;
+        }
+
+        // 打印辅助信息
+        std::cout << "\nKey switching technique: ";
+        switch (cryptoParams->GetKeySwitchTechnique()) {
+            case BV:
+                std::cout << "BV (no special primes)" << std::endl;
+                break;
+            case HYBRID:
+                std::cout << "HYBRID with " << cryptoParams->GetNumberOfQPartitions() << " partitions" << std::endl;
+                std::cout << "Alpha (towers per digit): " << cryptoParams->GetNumPerPartQ() << std::endl;
+                break;
+            default:
+                std::cout << "Unknown" << std::endl;
+        }
+    }
+    catch (const std::exception& e) {
+        std::cout << "\nCould not determine special primes: " << e.what() << std::endl;
+    }
+
+    std::cout << std::endl;
 
     // B. Step 2: Key Generation
     /* B1) Generate encryption keys.
@@ -172,80 +233,160 @@ int main() {
     std::vector<double> x1 = {0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> x2 = {5.0, 4.0, 3.0, 2.0, 1.0, 0.75, 0.5, 0.25};
 
-    // Encoding as plaintexts
-    Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1);
+    // 编码计时（微秒级）
+    auto encode_start = std::chrono::high_resolution_clock::now();
+    Plaintext ptxt1   = cc->MakeCKKSPackedPlaintext(x1);
+    auto encode_end   = std::chrono::high_resolution_clock::now();
+    auto encode_us    = std::chrono::duration_cast<std::chrono::microseconds>(encode_end - encode_start).count();
+    std::cout << "编码 x1 (Encode): " << encode_us << " us" << std::endl;
+
+    encode_start    = std::chrono::high_resolution_clock::now();
     Plaintext ptxt2 = cc->MakeCKKSPackedPlaintext(x2);
+    encode_end      = std::chrono::high_resolution_clock::now();
+    encode_us       = std::chrono::duration_cast<std::chrono::microseconds>(encode_end - encode_start).count();
+    std::cout << "编码 x2 (Encode): " << encode_us << " us" << std::endl;
 
     std::cout << "Input x1: " << ptxt1 << std::endl;
     std::cout << "Input x2: " << ptxt2 << std::endl;
 
-    // Encrypt the encoded vectors
-    auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
-    auto c2 = cc->Encrypt(keys.publicKey, ptxt2);
+    // 加密操作计时（微秒级）
+    std::cout << "\n======= 加解密操作时间 =======" << std::endl;
+    auto op_start = std::chrono::high_resolution_clock::now();
+    auto c1       = cc->Encrypt(keys.publicKey, ptxt1);
+    auto op_end   = std::chrono::high_resolution_clock::now();
+    auto op_us    = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "加密 x1 (Encrypt): " << op_us << " us" << std::endl;
+
+    op_start = std::chrono::high_resolution_clock::now();
+    auto c2  = cc->Encrypt(keys.publicKey, ptxt2);
+    op_end   = std::chrono::high_resolution_clock::now();
+    op_us    = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "加密 x2 (Encrypt): " << op_us << " us" << std::endl;
 
     // Step 4: Evaluation
+    std::cout << "\n======= 操作执行时间 =======" << std::endl;
 
-    // Homomorphic addition
+    // 同态加法 (Homomorphic addition)
+    op_start  = std::chrono::high_resolution_clock::now();
     auto cAdd = cc->EvalAdd(c1, c2);
+    op_end    = std::chrono::high_resolution_clock::now();
+    op_us     = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "同态加法 (EvalAdd): " << op_us << " us" << std::endl;
 
-    // Homomorphic subtraction
+    // 同态减法 (Homomorphic subtraction)
+    op_start  = std::chrono::high_resolution_clock::now();
     auto cSub = cc->EvalSub(c1, c2);
+    op_end    = std::chrono::high_resolution_clock::now();
+    op_us     = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "同态减法 (EvalSub): " << op_us << " us" << std::endl;
 
-    // Homomorphic scalar multiplication
+    // 常量加法 (Constant addition)
+    op_start       = std::chrono::high_resolution_clock::now();
+    auto cAddConst = cc->EvalAdd(c1, 2.5);
+    op_end         = std::chrono::high_resolution_clock::now();
+    op_us          = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "常量加法 (EvalAdd scalar): " << op_us << " us" << std::endl;
+
+    // 同态乘法标量 (Homomorphic scalar multiplication)
+    op_start     = std::chrono::high_resolution_clock::now();
     auto cScalar = cc->EvalMult(c1, 4.0);
+    op_end       = std::chrono::high_resolution_clock::now();
+    op_us        = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "标量乘法 (EvalMult scalar): " << op_us << " us" << std::endl;
 
-    // Homomorphic multiplication
+    // 同态乘法 (Homomorphic multiplication)
+    op_start  = std::chrono::high_resolution_clock::now();
     auto cMul = cc->EvalMult(c1, c2);
+    op_end    = std::chrono::high_resolution_clock::now();
+    op_us     = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "同态乘法 (EvalMult): " << op_us << " us" << std::endl;
 
-    // Homomorphic rotations
+    // 同态旋转 (Homomorphic rotations)
+    op_start   = std::chrono::high_resolution_clock::now();
     auto cRot1 = cc->EvalRotate(c1, 1);
+    op_end     = std::chrono::high_resolution_clock::now();
+    op_us      = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "同态旋转 +1 (EvalRotate): " << op_us << " us" << std::endl;
+
+    op_start   = std::chrono::high_resolution_clock::now();
     auto cRot2 = cc->EvalRotate(c1, -2);
+    op_end     = std::chrono::high_resolution_clock::now();
+    op_us      = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    std::cout << "同态旋转 -2 (EvalRotate): " << op_us << " us" << std::endl;
 
     // Step 5: Decryption and output
     Plaintext result;
-    // We set the cout precision to 8 decimal digits for a nicer output.
-    // If you want to see the error/noise introduced by CKKS, bump it up
-    // to 15 and it should become visible.
     std::cout.precision(8);
 
     std::cout << std::endl << "Results of homomorphic computations: " << std::endl;
 
+    // 解码计时（微秒级）
+    auto decode_start = std::chrono::high_resolution_clock::now();
     cc->Decrypt(keys.secretKey, c1, &result);
+    auto decode_end = std::chrono::high_resolution_clock::now();
+    auto decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    std::cout << "解密 x1 (Decrypt): " << decode_us << " us" << std::endl;
     result->SetLength(batchSize);
     std::cout << "x1 = " << result;
     std::cout << "Estimated precision in bits: " << result->GetLogPrecision() << std::endl;
 
-    // Decrypt the result of addition
+    decode_start = std::chrono::high_resolution_clock::now();
     cc->Decrypt(keys.secretKey, cAdd, &result);
+    decode_end = std::chrono::high_resolution_clock::now();
+    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
     result->SetLength(batchSize);
     std::cout << "x1 + x2 = " << result;
+    std::cout << "解密 x1+x2 (Decrypt): " << decode_us << " us" << std::endl;
     std::cout << "Estimated precision in bits: " << result->GetLogPrecision() << std::endl;
 
-    // Decrypt the result of subtraction
+    decode_start = std::chrono::high_resolution_clock::now();
     cc->Decrypt(keys.secretKey, cSub, &result);
+    decode_end = std::chrono::high_resolution_clock::now();
+    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
     result->SetLength(batchSize);
     std::cout << "x1 - x2 = " << result << std::endl;
+    std::cout << "解密 x1-x2 (Decrypt): " << decode_us << " us" << std::endl;
 
-    // Decrypt the result of scalar multiplication
+    decode_start = std::chrono::high_resolution_clock::now();
+    cc->Decrypt(keys.secretKey, cAddConst, &result);
+    decode_end = std::chrono::high_resolution_clock::now();
+    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    result->SetLength(batchSize);
+    std::cout << "x1 + 2.5 = " << result << std::endl;
+    std::cout << "解密 x1+2.5 (Decrypt): " << decode_us << " us" << std::endl;
+
+    decode_start = std::chrono::high_resolution_clock::now();
     cc->Decrypt(keys.secretKey, cScalar, &result);
+    decode_end = std::chrono::high_resolution_clock::now();
+    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
     result->SetLength(batchSize);
     std::cout << "4 * x1 = " << result << std::endl;
+    std::cout << "解密 4*x1 (Decrypt): " << decode_us << " us" << std::endl;
 
-    // Decrypt the result of multiplication
+    decode_start = std::chrono::high_resolution_clock::now();
     cc->Decrypt(keys.secretKey, cMul, &result);
+    decode_end = std::chrono::high_resolution_clock::now();
+    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
     result->SetLength(batchSize);
     std::cout << "x1 * x2 = " << result << std::endl;
+    std::cout << "解密 x1*x2 (Decrypt): " << decode_us << " us" << std::endl;
 
-    // Decrypt the result of rotations
-
+    decode_start = std::chrono::high_resolution_clock::now();
     cc->Decrypt(keys.secretKey, cRot1, &result);
+    decode_end = std::chrono::high_resolution_clock::now();
+    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
     result->SetLength(batchSize);
     std::cout << std::endl << "In rotations, very small outputs (~10^-10 here) correspond to 0's:" << std::endl;
     std::cout << "x1 rotate by 1 = " << result << std::endl;
+    std::cout << "解密 x1旋转+1 (Decrypt): " << decode_us << " us" << std::endl;
 
+    decode_start = std::chrono::high_resolution_clock::now();
     cc->Decrypt(keys.secretKey, cRot2, &result);
+    decode_end = std::chrono::high_resolution_clock::now();
+    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
     result->SetLength(batchSize);
     std::cout << "x1 rotate by -2 = " << result << std::endl;
+    std::cout << "解密 x1旋转-2 (Decrypt): " << decode_us << " us" << std::endl;
 
     return 0;
 }
