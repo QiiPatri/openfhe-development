@@ -239,15 +239,13 @@ void BootstrapExample(uint32_t numSlots) {
     // Step 5: Perform the bootstrapping operation. The goal is to increase the number of levels remaining
     // for HE computation.
 
-    // 为引导操作添加计时
-    TimeVar t;
-    double timeElapsed;
-    
+    // 为自举操作添加微秒级计时
     std::cout << "Starting bootstrapping operation..." << std::endl;
-    TIC(t);
+    auto boot_start = std::chrono::high_resolution_clock::now();
     auto ciphertextAfter = cryptoContext->EvalBootstrap(ciph);
-    timeElapsed = TOC(t);
-    std::cout << "Bootstrapping operation completed in " << timeElapsed << " ms" << std::endl;
+    auto boot_end = std::chrono::high_resolution_clock::now();
+    auto boot_us = std::chrono::duration_cast<std::chrono::microseconds>(boot_end - boot_start).count();
+    std::cout << "Bootstrapping operation completed in " << boot_us << " us" << std::endl;
 
     std::cout << "Number of levels remaining after bootstrapping: " << depth - ciphertextAfter->GetLevel() << std::endl
               << std::endl;
