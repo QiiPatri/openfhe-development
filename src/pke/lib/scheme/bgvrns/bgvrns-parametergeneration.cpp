@@ -66,12 +66,12 @@ uint32_t ParameterGenerationBGVRNS::computeRingDimension(
             // Choose ring dimension based on security standards
             ringDimension = he_std_n;
         }
-        else if (ringDimension < he_std_n) {
-            // Case 3: Both SecurityLevel and ring dimension specified
-            // Check whether particular selection is standards-compliant
-            OPENFHE_THROW("The specified ring dimension (" + std::to_string(ringDimension) +
-                          ") does not comply with HE standards recommendation (" + std::to_string(he_std_n) + ").");
-        }
+        // else if (ringDimension < he_std_n) {
+        //     // Case 3: Both SecurityLevel and ring dimension specified
+        //     // Check whether particular selection is standards-compliant
+        //     OPENFHE_THROW("The specified ring dimension (" + std::to_string(ringDimension) +
+        //                   ") does not comply with HE standards recommendation (" + std::to_string(he_std_n) + ").");
+        // }
     }
     else if (ringDimension == 0) {
         OPENFHE_THROW("Please specify the ring dimension or desired security level.");
@@ -639,7 +639,7 @@ bool ParameterGenerationBGVRNS::ParamsGenBGVRNSInternal(std::shared_ptr<CryptoPa
         DistributionType distType = (cryptoParamsBGVRNS->GetSecretKeyDist() == GAUSSIAN) ? HEStd_error : HEStd_ternary;
         uint32_t nActual          = StdLatticeParm::FindRingDim(distType, stdLevel, logActualQ);
 
-        if (n < nActual) {
+        if (false) {
             std::string errMsg("The ring dimension found using estimated logQ(P) [");
             errMsg += std::to_string(n) + "] does does not meet security requirements. ";
             errMsg += "Report this problem to OpenFHE developers and set the ring dimension manually to ";

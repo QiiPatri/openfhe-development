@@ -233,86 +233,91 @@ int main() {
     std::vector<double> x1 = {0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> x2 = {5.0, 4.0, 3.0, 2.0, 1.0, 0.75, 0.5, 0.25};
 
-    // 编码计时（微秒级）
-    auto encode_start = std::chrono::high_resolution_clock::now();
-    Plaintext ptxt1   = cc->MakeCKKSPackedPlaintext(x1);
-    auto encode_end   = std::chrono::high_resolution_clock::now();
-    auto encode_us    = std::chrono::duration_cast<std::chrono::microseconds>(encode_end - encode_start).count();
-    std::cout << "编码 x1 (Encode): " << encode_us << " us" << std::endl;
+    // 编码计时（微秒级，循环10次取平均）
+    uint64_t encode_sum1 = 0, encode_sum2 = 0;
+    Plaintext ptxt1, ptxt2;
+    for (int i = 0; i < 10; ++i) {
+        auto encode_start = std::chrono::high_resolution_clock::now();
+        ptxt1 = cc->MakeCKKSPackedPlaintext(x1);
+        auto encode_end = std::chrono::high_resolution_clock::now();
+        encode_sum1 += std::chrono::duration_cast<std::chrono::microseconds>(encode_end - encode_start).count();
 
-    encode_start    = std::chrono::high_resolution_clock::now();
-    Plaintext ptxt2 = cc->MakeCKKSPackedPlaintext(x2);
-    encode_end      = std::chrono::high_resolution_clock::now();
-    encode_us       = std::chrono::duration_cast<std::chrono::microseconds>(encode_end - encode_start).count();
-    std::cout << "编码 x2 (Encode): " << encode_us << " us" << std::endl;
+        encode_start = std::chrono::high_resolution_clock::now();
+        ptxt2 = cc->MakeCKKSPackedPlaintext(x2);
+        encode_end = std::chrono::high_resolution_clock::now();
+        encode_sum2 += std::chrono::duration_cast<std::chrono::microseconds>(encode_end - encode_start).count();
+    }
+    std::cout << "编码 x1 (Encode) 平均: " << encode_sum1 / 10 << " us" << std::endl;
+    std::cout << "编码 x2 (Encode) 平均: " << encode_sum2 / 10 << " us" << std::endl;
 
     std::cout << "Input x1: " << ptxt1 << std::endl;
     std::cout << "Input x2: " << ptxt2 << std::endl;
 
-    // 加密操作计时（微秒级）
-    std::cout << "\n======= 加解密操作时间 =======" << std::endl;
-    auto op_start = std::chrono::high_resolution_clock::now();
-    auto c1       = cc->Encrypt(keys.publicKey, ptxt1);
-    auto op_end   = std::chrono::high_resolution_clock::now();
-    auto op_us    = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "加密 x1 (Encrypt): " << op_us << " us" << std::endl;
+    // 加密操作计时（微秒级，循环10次取平均）
+    std::cout << "\n======= 加解密操作时间(平均) =======" << std::endl;
+    uint64_t enc_sum1 = 0, enc_sum2 = 0;
+    Ciphertext<DCRTPoly> c1, c2;
+    for (int i = 0; i < 10; ++i) {
+        auto op_start = std::chrono::high_resolution_clock::now();
+        c1 = cc->Encrypt(keys.publicKey, ptxt1);
+        auto op_end = std::chrono::high_resolution_clock::now();
+        enc_sum1 += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
 
-    op_start = std::chrono::high_resolution_clock::now();
-    auto c2  = cc->Encrypt(keys.publicKey, ptxt2);
-    op_end   = std::chrono::high_resolution_clock::now();
-    op_us    = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "加密 x2 (Encrypt): " << op_us << " us" << std::endl;
+        op_start = std::chrono::high_resolution_clock::now();
+        c2 = cc->Encrypt(keys.publicKey, ptxt2);
+        op_end = std::chrono::high_resolution_clock::now();
+        enc_sum2 += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    }
+    std::cout << "加密 x1 (Encrypt) 平均: " << enc_sum1 / 10 << " us" << std::endl;
+    std::cout << "加密 x2 (Encrypt) 平均: " << enc_sum2 / 10 << " us" << std::endl;
 
     // Step 4: Evaluation
-    std::cout << "\n======= 操作执行时间 =======" << std::endl;
+    std::cout << "\n======= 操作执行时间(平均) =======" << std::endl;
+    uint64_t add_sum = 0, sub_sum = 0, addconst_sum = 0, scalarmult_sum = 0, mult_sum = 0, rot1_sum = 0, rot2_sum = 0;
+    Ciphertext<DCRTPoly> cAdd, cSub, cAddConst, cScalar, cMul, cRot1, cRot2;
+    for (int i = 0; i < 10; ++i) {
+        auto op_start = std::chrono::high_resolution_clock::now();
+        cAdd = cc->EvalAdd(c1, c2);
+        auto op_end = std::chrono::high_resolution_clock::now();
+        add_sum += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
 
-    // 同态加法 (Homomorphic addition)
-    op_start  = std::chrono::high_resolution_clock::now();
-    auto cAdd = cc->EvalAdd(c1, c2);
-    op_end    = std::chrono::high_resolution_clock::now();
-    op_us     = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "同态加法 (EvalAdd): " << op_us << " us" << std::endl;
+        op_start = std::chrono::high_resolution_clock::now();
+        cSub = cc->EvalSub(c1, c2);
+        op_end = std::chrono::high_resolution_clock::now();
+        sub_sum += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
 
-    // 同态减法 (Homomorphic subtraction)
-    op_start  = std::chrono::high_resolution_clock::now();
-    auto cSub = cc->EvalSub(c1, c2);
-    op_end    = std::chrono::high_resolution_clock::now();
-    op_us     = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "同态减法 (EvalSub): " << op_us << " us" << std::endl;
+        op_start = std::chrono::high_resolution_clock::now();
+        cAddConst = cc->EvalAdd(c1, 2.5);
+        op_end = std::chrono::high_resolution_clock::now();
+        addconst_sum += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
 
-    // 常量加法 (Constant addition)
-    op_start       = std::chrono::high_resolution_clock::now();
-    auto cAddConst = cc->EvalAdd(c1, 2.5);
-    op_end         = std::chrono::high_resolution_clock::now();
-    op_us          = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "常量加法 (EvalAdd scalar): " << op_us << " us" << std::endl;
+        op_start = std::chrono::high_resolution_clock::now();
+        cScalar = cc->EvalMult(c1, 4.0);
+        op_end = std::chrono::high_resolution_clock::now();
+        scalarmult_sum += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
 
-    // 同态乘法标量 (Homomorphic scalar multiplication)
-    op_start     = std::chrono::high_resolution_clock::now();
-    auto cScalar = cc->EvalMult(c1, 4.0);
-    op_end       = std::chrono::high_resolution_clock::now();
-    op_us        = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "标量乘法 (EvalMult scalar): " << op_us << " us" << std::endl;
+        op_start = std::chrono::high_resolution_clock::now();
+        cMul = cc->EvalMult(c1, c2);
+        op_end = std::chrono::high_resolution_clock::now();
+        mult_sum += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
 
-    // 同态乘法 (Homomorphic multiplication)
-    op_start  = std::chrono::high_resolution_clock::now();
-    auto cMul = cc->EvalMult(c1, c2);
-    op_end    = std::chrono::high_resolution_clock::now();
-    op_us     = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "同态乘法 (EvalMult): " << op_us << " us" << std::endl;
+        op_start = std::chrono::high_resolution_clock::now();
+        cRot1 = cc->EvalRotate(c1, 1);
+        op_end = std::chrono::high_resolution_clock::now();
+        rot1_sum += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
 
-    // 同态旋转 (Homomorphic rotations)
-    op_start   = std::chrono::high_resolution_clock::now();
-    auto cRot1 = cc->EvalRotate(c1, 1);
-    op_end     = std::chrono::high_resolution_clock::now();
-    op_us      = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "同态旋转 +1 (EvalRotate): " << op_us << " us" << std::endl;
-
-    op_start   = std::chrono::high_resolution_clock::now();
-    auto cRot2 = cc->EvalRotate(c1, -2);
-    op_end     = std::chrono::high_resolution_clock::now();
-    op_us      = std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
-    std::cout << "同态旋转 -2 (EvalRotate): " << op_us << " us" << std::endl;
+        op_start = std::chrono::high_resolution_clock::now();
+        cRot2 = cc->EvalRotate(c1, -2);
+        op_end = std::chrono::high_resolution_clock::now();
+        rot2_sum += std::chrono::duration_cast<std::chrono::microseconds>(op_end - op_start).count();
+    }
+    std::cout << "同态加法 (EvalAdd) 平均: " << add_sum / 10 << " us" << std::endl;
+    std::cout << "同态减法 (EvalSub) 平均: " << sub_sum / 10 << " us" << std::endl;
+    std::cout << "常量加法 (EvalAdd scalar) 平均: " << addconst_sum / 10 << " us" << std::endl;
+    std::cout << "标量乘法 (EvalMult scalar) 平均: " << scalarmult_sum / 10 << " us" << std::endl;
+    std::cout << "同态乘法 (EvalMult) 平均: " << mult_sum / 10 << " us" << std::endl;
+    std::cout << "同态旋转 +1 (EvalRotate) 平均: " << rot1_sum / 10 << " us" << std::endl;
+    std::cout << "同态旋转 -2 (EvalRotate) 平均: " << rot2_sum / 10 << " us" << std::endl;
 
     // Step 5: Decryption and output
     Plaintext result;
@@ -320,73 +325,90 @@ int main() {
 
     std::cout << std::endl << "Results of homomorphic computations: " << std::endl;
 
-    // 解码计时（微秒级）
-    auto decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, c1, &result);
-    auto decode_end = std::chrono::high_resolution_clock::now();
-    auto decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
-    std::cout << "解密 x1 (Decrypt): " << decode_us << " us" << std::endl;
+    // 解码计时（微秒级，循环10次取平均）
+    uint64_t dec_sum1 = 0, dec_sumAdd = 0, dec_sumSub = 0, dec_sumAddConst = 0, dec_sumScalar = 0, dec_sumMul = 0, dec_sumRot1 = 0, dec_sumRot2 = 0;
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, c1, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sum1 += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
+    std::cout << "解密 x1 (Decrypt) 平均: " << dec_sum1 / 10 << " us" << std::endl;
     std::cout << "x1 = " << result;
     std::cout << "Estimated precision in bits: " << result->GetLogPrecision() << std::endl;
 
-    decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, cAdd, &result);
-    decode_end = std::chrono::high_resolution_clock::now();
-    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, cAdd, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sumAdd += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
     std::cout << "x1 + x2 = " << result;
-    std::cout << "解密 x1+x2 (Decrypt): " << decode_us << " us" << std::endl;
+    std::cout << "解密 x1+x2 (Decrypt) 平均: " << dec_sumAdd / 10 << " us" << std::endl;
     std::cout << "Estimated precision in bits: " << result->GetLogPrecision() << std::endl;
 
-    decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, cSub, &result);
-    decode_end = std::chrono::high_resolution_clock::now();
-    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, cSub, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sumSub += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
     std::cout << "x1 - x2 = " << result << std::endl;
-    std::cout << "解密 x1-x2 (Decrypt): " << decode_us << " us" << std::endl;
+    std::cout << "解密 x1-x2 (Decrypt) 平均: " << dec_sumSub / 10 << " us" << std::endl;
 
-    decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, cAddConst, &result);
-    decode_end = std::chrono::high_resolution_clock::now();
-    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, cAddConst, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sumAddConst += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
     std::cout << "x1 + 2.5 = " << result << std::endl;
-    std::cout << "解密 x1+2.5 (Decrypt): " << decode_us << " us" << std::endl;
+    std::cout << "解密 x1+2.5 (Decrypt) 平均: " << dec_sumAddConst / 10 << " us" << std::endl;
 
-    decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, cScalar, &result);
-    decode_end = std::chrono::high_resolution_clock::now();
-    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, cScalar, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sumScalar += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
     std::cout << "4 * x1 = " << result << std::endl;
-    std::cout << "解密 4*x1 (Decrypt): " << decode_us << " us" << std::endl;
+    std::cout << "解密 4*x1 (Decrypt) 平均: " << dec_sumScalar / 10 << " us" << std::endl;
 
-    decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, cMul, &result);
-    decode_end = std::chrono::high_resolution_clock::now();
-    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, cMul, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sumMul += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
     std::cout << "x1 * x2 = " << result << std::endl;
-    std::cout << "解密 x1*x2 (Decrypt): " << decode_us << " us" << std::endl;
+    std::cout << "解密 x1*x2 (Decrypt) 平均: " << dec_sumMul / 10 << " us" << std::endl;
 
-    decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, cRot1, &result);
-    decode_end = std::chrono::high_resolution_clock::now();
-    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, cRot1, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sumRot1 += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
     std::cout << std::endl << "In rotations, very small outputs (~10^-10 here) correspond to 0's:" << std::endl;
     std::cout << "x1 rotate by 1 = " << result << std::endl;
-    std::cout << "解密 x1旋转+1 (Decrypt): " << decode_us << " us" << std::endl;
+    std::cout << "解密 x1旋转+1 (Decrypt) 平均: " << dec_sumRot1 / 10 << " us" << std::endl;
 
-    decode_start = std::chrono::high_resolution_clock::now();
-    cc->Decrypt(keys.secretKey, cRot2, &result);
-    decode_end = std::chrono::high_resolution_clock::now();
-    decode_us  = std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    for (int i = 0; i < 10; ++i) {
+        auto decode_start = std::chrono::high_resolution_clock::now();
+        cc->Decrypt(keys.secretKey, cRot2, &result);
+        auto decode_end = std::chrono::high_resolution_clock::now();
+        dec_sumRot2 += std::chrono::duration_cast<std::chrono::microseconds>(decode_end - decode_start).count();
+    }
     result->SetLength(batchSize);
     std::cout << "x1 rotate by -2 = " << result << std::endl;
-    std::cout << "解密 x1旋转-2 (Decrypt): " << decode_us << " us" << std::endl;
+    std::cout << "解密 x1旋转-2 (Decrypt) 平均: " << dec_sumRot2 / 10 << " us" << std::endl;
 
     return 0;
 }
