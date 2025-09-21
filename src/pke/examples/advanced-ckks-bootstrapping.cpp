@@ -103,6 +103,7 @@ void BootstrapExample(uint32_t numSlots) {
 
     parameters.SetScalingModSize(dcrtBits);
     parameters.SetScalingTechnique(rescaleTech);
+    parameters.SetSecurityLevel(HEStd_128_classic);
     parameters.SetFirstModSize(firstMod);
 
     /*  A4) Bootstrapping parameters.
