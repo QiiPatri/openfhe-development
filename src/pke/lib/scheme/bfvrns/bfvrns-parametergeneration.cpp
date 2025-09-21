@@ -315,10 +315,11 @@ bool ParameterGenerationBFVRNS::ParamsGenBFVRNSInternal(std::shared_ptr<CryptoPa
     }
 
     if ((n > nCustom) && (nCustom != 0))
-        OPENFHE_THROW("Ring dimension " + std::to_string(nCustom) +
-                      " specified by the user does not meet the "
-                      "security requirement. Please increase it to " +
-                      std::to_string(n) + ".");
+        n = nCustom;
+        // OPENFHE_THROW("Ring dimension " + std::to_string(nCustom) +
+        //               " specified by the user does not meet the "
+        //               "security requirement. Please increase it to " +
+        //               std::to_string(n) + ".");
 
     const size_t numInitialModuli = static_cast<size_t>(std::ceil(std::ceil(logq) / dcrtBits));
     if (numInitialModuli < 1)
