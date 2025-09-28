@@ -190,7 +190,7 @@ int main() {
     Ciphertext<DCRTPoly> ciphertextMul12, ciphertextMultResult;
     Ciphertext<DCRTPoly> ciphertextScalarAdd, ciphertextScalarMult;
     Ciphertext<DCRTPoly> ciphertextRot1, ciphertextRot2, ciphertextRot3, ciphertextRot4;
-    int64_t scalar            = 5;  // 可自定义标量值
+    int64_t scalar            = 2;  // 可自定义标量值
     Plaintext scalarPlaintext = cryptoContext->MakePackedPlaintext(std::vector<int64_t>{scalar});
 
     for (int i = 0; i < 10; ++i) {

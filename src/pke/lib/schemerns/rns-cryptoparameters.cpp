@@ -134,7 +134,8 @@ void CryptoParametersRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Scaling
         }
         // Select number of primes in auxiliary CRT basis
         uint32_t sizeP = static_cast<uint32_t>(std::ceil(static_cast<double>(maxBits) / auxBits));
-        sizeP = 1;
+        //todo
+        sizeP = 6;
 
         uint64_t primeStep = FindAuxPrimeStep();
 
@@ -145,7 +146,8 @@ void CryptoParametersRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Scaling
         std::vector<NativeInteger> rootsP(sizeP);
         // firstP contains a prime whose size is PModSize.
         NativeInteger firstP = FirstPrime<NativeInteger>(auxBits, primeStep);
-        firstP = FirstPrime<NativeInteger>(56, primeStep);
+        //todo
+        firstP = FirstPrime<NativeInteger>(50, primeStep);
         NativeInteger pPrev  = firstP;
         BigInteger modulusP(1);
         for (uint32_t i = 0; i < sizeP; i++) {
