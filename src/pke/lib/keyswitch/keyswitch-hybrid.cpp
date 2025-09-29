@@ -43,7 +43,42 @@
 #include "scheme/ckksrns/ckksrns-cryptoparameters.h"
 #include "ciphertext.h"
 
+#include <chrono>
+#include <atomic>
+#include <iostream>
+
 namespace lbcrypto {
+
+// File-local profiler for KeySwitch HYBRID only
+namespace {
+struct KeySwitchHybridProfiler {
+    std::atomic<uint64_t> innerProdTimeUs{0};
+    std::atomic<uint64_t> basisConvTimeUs{0};
+    std::atomic<uint64_t> innerProdCount{0};
+    std::atomic<uint64_t> basisConvCount{0};
+    std::atomic<uint64_t> modDownTimeUs{0};
+    std::atomic<uint64_t> modDownCount{0};
+
+        static KeySwitchHybridProfiler &Instance() {
+            // add mod-down counters to profiler
+            // (fields already in struct? if not, add here in-file; struct is file-local above)
+        static KeySwitchHybridProfiler inst;
+        return inst;
+    }
+
+    ~KeySwitchHybridProfiler() {
+        std::cerr << "[KeySwitchHYBRID] innerProdCount=" << innerProdCount.load()
+                  << " innerProdTimeUs=" << innerProdTimeUs.load()
+                  << " basisConvCount=" << basisConvCount.load()
+                  << " basisConvTimeUs=" << basisConvTimeUs.load()
+                  << " modDownCount=" << modDownCount.load()
+                  << " modDownTimeUs=" << modDownTimeUs.load() << std::endl;
+    }
+};
+
+auto &ksHybridProfiler = KeySwitchHybridProfiler::Instance();
+} // anonymous namespace
+
 
 EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldKey,
                                                         const PrivateKey<DCRTPoly> newKey) const {
@@ -273,17 +308,27 @@ Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchDown(ConstCiphertext<DCRTPoly> ci
 
     PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
 
+    auto modStart0 = std::chrono::high_resolution_clock::now();
     DCRTPoly ct0 = cTilda[0].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
                                            cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
                                            cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                            cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                            cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+    auto modEnd0 = std::chrono::high_resolution_clock::now();
+    ksHybridProfiler.modDownTimeUs +=
+        std::chrono::duration_cast<std::chrono::microseconds>(modEnd0 - modStart0).count();
+    ksHybridProfiler.modDownCount++;
 
+    auto modStart1 = std::chrono::high_resolution_clock::now();
     DCRTPoly ct1 = cTilda[1].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
                                            cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
                                            cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                            cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                            cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+    auto modEnd1 = std::chrono::high_resolution_clock::now();
+    ksHybridProfiler.modDownTimeUs +=
+        std::chrono::duration_cast<std::chrono::microseconds>(modEnd1 - modStart1).count();
+    ksHybridProfiler.modDownCount++;
 
     auto result = ciphertext->CloneEmpty();
     result->SetElements({std::move(ct0), std::move(ct1)});
@@ -310,11 +355,20 @@ DCRTPoly KeySwitchHYBRID::KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> ci
 
     PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
 
+
+    auto mdStart = std::chrono::high_resolution_clock::now();
     DCRTPoly cv0 = cTilda[0].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
                                            cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
                                            cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                            cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                            cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+    auto mdEnd = std::chrono::high_resolution_clock::now();
+    ksHybridProfiler.modDownTimeUs += std::chrono::duration_cast<std::chrono::microseconds>(mdEnd - mdStart).count();
+    ksHybridProfiler.modDownCount++;
+
+    // profile mod-down for first element
+    // (wrap the single-call above in timing)
+    
 
     return cv0;
 }
@@ -380,6 +434,8 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
     std::vector<DCRTPoly> partsCtExt(numPartQl);
 
     for (uint32_t part = 0; part < numPartQl; part++) {
+        // Basis conversion for this part: profile ApproxSwitchCRTBasis
+        auto basisStart = std::chrono::high_resolution_clock::now();
         auto partCtClone = partsCt[part].Clone();
         partCtClone.SetFormat(Format::COEFFICIENT);
 
@@ -392,6 +448,10 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
             cryptoParams->GetmodComplPartqBarrettMu(sizeQl - 1, part));
 
         partsCtCompl[part].SetFormat(Format::EVALUATION);
+        auto basisEnd = std::chrono::high_resolution_clock::now();
+        ksHybridProfiler.basisConvTimeUs +=
+            std::chrono::duration_cast<std::chrono::microseconds>(basisEnd - basisStart).count();
+        ksHybridProfiler.basisConvCount++;
 
         partsCtExt[part] = DCRTPoly(paramsQlP, Format::EVALUATION, true);
 
@@ -416,21 +476,29 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalFastKeySwitchCore(
     const std::shared_ptr<ParmType> paramsQl) const {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(evalKey->GetCryptoParameters());
 
-    std::shared_ptr<std::vector<DCRTPoly>> cTilda = EvalFastKeySwitchCoreExt(digits, evalKey, paramsQl);
+    std::shared_ptr<std::vector<DCRTPoly>> cTildaPtr = EvalFastKeySwitchCoreExt(digits, evalKey, paramsQl);
 
     PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
 
-    DCRTPoly ct0 = (*cTilda)[0].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
+    auto modStart0 = std::chrono::high_resolution_clock::now();
+    DCRTPoly ct0 = (*cTildaPtr)[0].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
                                               cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
                                               cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                               cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                               cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+    auto modEnd0 = std::chrono::high_resolution_clock::now();
+    ksHybridProfiler.modDownTimeUs += std::chrono::duration_cast<std::chrono::microseconds>(modEnd0 - modStart0).count();
+    ksHybridProfiler.modDownCount++;
 
-    DCRTPoly ct1 = (*cTilda)[1].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
+    auto modStart1 = std::chrono::high_resolution_clock::now();
+    DCRTPoly ct1 = (*cTildaPtr)[1].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
                                               cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
                                               cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                               cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                               cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+    auto modEnd1 = std::chrono::high_resolution_clock::now();
+    ksHybridProfiler.modDownTimeUs += std::chrono::duration_cast<std::chrono::microseconds>(modEnd1 - modStart1).count();
+    ksHybridProfiler.modDownCount++;
 
     return std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{std::move(ct0), std::move(ct1)});
 }
@@ -457,6 +525,7 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalFastKeySwitchCoreExt
         const DCRTPoly& bj = bv[j];
         const DCRTPoly& aj = av[j];
 
+        auto innerStart = std::chrono::high_resolution_clock::now();
         for (usint i = 0; i < sizeQl; i++) {
             const auto& cji = cj.GetElementAtIndex(i);
             const auto& aji = aj.GetElementAtIndex(i);
@@ -473,6 +542,10 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalFastKeySwitchCoreExt
             cTilda0.SetElementAtIndex(i, cTilda0.GetElementAtIndex(i) + cji * bji);
             cTilda1.SetElementAtIndex(i, cTilda1.GetElementAtIndex(i) + cji * aji);
         }
+        auto innerEnd = std::chrono::high_resolution_clock::now();
+        ksHybridProfiler.innerProdTimeUs +=
+            std::chrono::duration_cast<std::chrono::microseconds>(innerEnd - innerStart).count();
+        ksHybridProfiler.innerProdCount++;
     }
 
     return std::make_shared<std::vector<DCRTPoly>>(
