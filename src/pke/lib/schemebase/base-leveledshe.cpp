@@ -333,9 +333,17 @@ void LeveledSHEBase<Element>::RelinearizeInPlace(Ciphertext<Element>& ciphertext
     auto algo = ciphertext->GetCryptoContext()->GetScheme();
 
     for (size_t j = 2; j < cv.size(); ++j) {
-        auto ab = algo->KeySwitchCore(cv[j], evalKeyVec[j - 2]);
-        cv[0] += (*ab)[0];
-        cv[1] += (*ab)[1];
+    // time the key switching core for this part and log the duration
+    auto ksStart = std::chrono::high_resolution_clock::now();
+    auto ab = algo->KeySwitchCore(cv[j], evalKeyVec[j - 2]);
+    auto ksEnd = std::chrono::high_resolution_clock::now();
+    std::cerr << "[KeySwitchTiming] partIndex=" << (j - 2)
+          << " time_us="
+          << std::chrono::duration_cast<std::chrono::microseconds>(ksEnd - ksStart).count()
+          << std::endl;
+
+    cv[0] += (*ab)[0];
+    cv[1] += (*ab)[1];
     }
     cv.resize(2);
 }

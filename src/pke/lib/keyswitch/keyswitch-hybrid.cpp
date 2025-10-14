@@ -246,7 +246,9 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
 void KeySwitchHYBRID::KeySwitchInPlace(Ciphertext<DCRTPoly>& ciphertext, const EvalKey<DCRTPoly> ek) const {
     std::vector<DCRTPoly>& cv = ciphertext->GetElements();
 
+    auto ksStart = std::chrono::high_resolution_clock::now();
     std::shared_ptr<std::vector<DCRTPoly>> ba = (cv.size() == 2) ? KeySwitchCore(cv[1], ek) : KeySwitchCore(cv[2], ek);
+
 
     cv[0].SetFormat((*ba)[0].GetFormat());
     cv[0] += (*ba)[0];
@@ -259,6 +261,10 @@ void KeySwitchHYBRID::KeySwitchInPlace(Ciphertext<DCRTPoly>& ciphertext, const E
         cv[1] = (*ba)[1];
     }
     cv.resize(2);
+    auto ksEnd = std::chrono::high_resolution_clock::now();
+    std::cerr << "[KeySwitchTiming] KeySwitchInPlace time_us="
+              << std::chrono::duration_cast<std::chrono::microseconds>(ksEnd - ksStart).count()
+              << std::endl;
 }
 
 Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchExt(ConstCiphertext<DCRTPoly> ciphertext, bool addFirst) const {
@@ -375,8 +381,14 @@ DCRTPoly KeySwitchHYBRID::KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> ci
 
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::KeySwitchCore(const DCRTPoly& a,
                                                                       const EvalKey<DCRTPoly> evalKey) const {
-    return EvalFastKeySwitchCore(EvalKeySwitchPrecomputeCore(a, evalKey->GetCryptoParameters()), evalKey,
-                                 a.GetParams());
+    auto ksStart = std::chrono::high_resolution_clock::now();
+    auto parts  = EvalKeySwitchPrecomputeCore(a, evalKey->GetCryptoParameters());
+    auto result = EvalFastKeySwitchCore(parts, evalKey, a.GetParams());
+    auto ksEnd = std::chrono::high_resolution_clock::now();
+    std::cerr << "[KeySwitchTiming] KeySwitchCore time_us="
+              << std::chrono::duration_cast<std::chrono::microseconds>(ksEnd - ksStart).count()
+              << std::endl;
+    return result;
 }
 
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeCore(
