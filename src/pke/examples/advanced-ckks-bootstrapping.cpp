@@ -240,19 +240,22 @@ void BootstrapExample(uint32_t numSlots) {
     // for HE computation.
 
     // 为自举操作添加微秒级计时
-    std::cout << "Starting bootstrapping operation..." << std::endl;
-    auto boot_start = std::chrono::high_resolution_clock::now();
-    auto ciphertextAfter = cryptoContext->EvalBootstrap(ciph);
-    auto boot_end = std::chrono::high_resolution_clock::now();
-    auto boot_us = std::chrono::duration_cast<std::chrono::microseconds>(boot_end - boot_start).count();
-    std::cout << "Bootstrapping operation completed in " << boot_us << " us" << std::endl;
+    long boot_us = 0;
+    for (size_t i = 0; i < 100; i++) {
+        std::cout << "Starting bootstrapping operation..." << std::endl;
+        auto boot_start = std::chrono::high_resolution_clock::now();
+        auto ciphertextAfter = cryptoContext->EvalBootstrap(ciph);
+        auto boot_end = std::chrono::high_resolution_clock::now();
+        boot_us += std::chrono::duration_cast<std::chrono::microseconds>(boot_end - boot_start).count();
+    }
+    std::cout << "Bootstrapping operation completed in " << boot_us/100 << " us" << std::endl;
 
-    std::cout << "Number of levels remaining after bootstrapping: " << depth - ciphertextAfter->GetLevel() << std::endl
-              << std::endl;
+    // std::cout << "Number of levels remaining after bootstrapping: " << depth - ciphertextAfter->GetLevel() << std::endl
+    //           << std::endl;
 
     // Step 7: Decryption and output
-    Plaintext result;
-    cryptoContext->Decrypt(keyPair.secretKey, ciphertextAfter, &result);
-    result->SetLength(numSlots);
-    std::cout << "Output after bootstrapping \n\t" << result << std::endl;
+    // Plaintext result;
+    // cryptoContext->Decrypt(keyPair.secretKey, ciphertextAfter, &result);
+    // result->SetLength(numSlots);
+    // std::cout << "Output after bootstrapping \n\t" << result << std::endl;
 }
