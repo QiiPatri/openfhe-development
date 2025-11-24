@@ -33,7 +33,7 @@ int main() {
     uint64_t encode_sum = 0;
     Plaintext plaintext1, plaintext2, plaintext3;
     Ciphertext<DCRTPoly> ciphertext1, ciphertext2, ciphertext3;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         auto t1 = std::chrono::high_resolution_clock::now();
         plaintext1 = cryptoContext->MakePackedPlaintext(vectorOfInts1);
         ciphertext1 = cryptoContext->Encrypt(keyPair.publicKey, plaintext1);
@@ -53,7 +53,7 @@ int main() {
         encode_sum += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     }
 
-    std::cout << "OPENFHE/BGV/加密 平均: " << encode_sum / 30 << " us" << std::endl;
+    std::cout << "OPENFHE/BGV/加密 平均: " << encode_sum / 300 << " us" << std::endl;
 
     auto cAdd12 = cryptoContext->EvalAdd(ciphertext1, ciphertext2);
     auto cAddRes = cryptoContext->EvalAdd(cAdd12, ciphertext3);
@@ -67,7 +67,7 @@ int main() {
 
     uint64_t dec_sum = 0;
     Plaintext pt;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         auto d1 = std::chrono::high_resolution_clock::now();
         cryptoContext->Decrypt(keyPair.secretKey, cAddRes, &pt);
         auto d2 = std::chrono::high_resolution_clock::now();
@@ -79,6 +79,6 @@ int main() {
         cryptoContext->Decrypt(keyPair.secretKey, cRot4, &pt);
     }
 
-    std::cout << "OPENFHE/BGV/解密 平均: " << dec_sum / 10 << " us" << std::endl;
+    std::cout << "OPENFHE/BGV/解密 平均: " << dec_sum / 100 << " us" << std::endl;
     return 0;
 }

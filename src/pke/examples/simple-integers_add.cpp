@@ -79,7 +79,7 @@ int main() {
     int64_t scalar = 2;
     Plaintext scalarPlaintext = cryptoContext->MakePackedPlaintext(std::vector<int64_t>{scalar});
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         auto t1 = std::chrono::high_resolution_clock::now();
         ciphertextAdd12 = cryptoContext->EvalAdd(ciphertext1, ciphertext2);
         auto t2 = std::chrono::high_resolution_clock::now();
@@ -93,8 +93,8 @@ int main() {
         scalar_add_sum += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     }
 
-    std::cout << "OPENFHE/BFV/密文-密文加法 平均: " << add_sum / 10 << " us" << std::endl;
-    std::cout << "OPENFHE/BFV/密文-明文加法 平均: " << scalar_add_sum / 10 << " us" << std::endl;
+    std::cout << "OPENFHE/BFV/密文-密文加法 平均: " << add_sum / 100 << " us" << std::endl;
+    std::cout << "OPENFHE/BFV/密文-明文加法 平均: " << scalar_add_sum / 100 << " us" << std::endl;
 
     return 0;
 }

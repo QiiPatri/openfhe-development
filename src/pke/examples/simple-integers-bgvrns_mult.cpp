@@ -44,7 +44,7 @@ int main() {
     int64_t scalar = 5;
     Plaintext scalarP = cryptoContext->MakePackedPlaintext(std::vector<int64_t>{scalar});
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         auto t1 = std::chrono::high_resolution_clock::now();
         cMul12 = cryptoContext->EvalMult(c1, c2);
         auto t2 = std::chrono::high_resolution_clock::now();
@@ -58,7 +58,7 @@ int main() {
         scalar_mult_sum += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     }
 
-    std::cout << "OPENFHE/BGV/同态乘法 平均: " << mult_sum / 10 << " us" << std::endl;
-    std::cout << "OPENFHE/BGV/标量乘法 平均: " << scalar_mult_sum / 10 << " us" << std::endl;
+    std::cout << "OPENFHE/BGV/密文-密文乘法 平均: " << mult_sum / 100 << " us" << std::endl;
+    std::cout << "OPENFHE/BGV/密文-明文乘法 平均: " << scalar_mult_sum / 100 << " us" << std::endl;
     return 0;
 }
