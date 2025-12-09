@@ -72,3 +72,6 @@ test_detail.xml
 
 # Visual Studio Code
 .vscode
+
+# Ignore benchmark binaries produced outside source tree
+benchmarkBin/
