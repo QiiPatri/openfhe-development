@@ -248,8 +248,8 @@ void BootstrapExample(uint32_t numSlots) {
         auto boot_end = std::chrono::high_resolution_clock::now();
         boot_us += std::chrono::duration_cast<std::chrono::microseconds>(boot_end - boot_start).count();
     }
-    std::cout << "Bootstrapping operation completed in " << boot_us/100 << " us" << std::endl;
-
+    // std::cout << "OPENFHE/CKKS/自举 总耗时(us): " << boot_us<< " us" << std::endl;
+    std::cout << "OPENFHE/CKKS/自举 总耗时(us): " << boot_us << ", 执行次数:" << 100 << ", 平均耗时(us): " << boot_us / 100 << std::endl;
     // std::cout << "Number of levels remaining after bootstrapping: " << depth - ciphertextAfter->GetLevel() << std::endl
     //           << std::endl;
 
