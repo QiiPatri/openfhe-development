@@ -36,7 +36,7 @@ int main() {
     uint64_t add_sum = 0, addconst_sum = 0;
     Ciphertext<DCRTPoly> cAdd, cAddConst;
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         auto s = std::chrono::high_resolution_clock::now();
         cAdd = cc->EvalAdd(c1, c2);
         auto e = std::chrono::high_resolution_clock::now();
@@ -48,7 +48,7 @@ int main() {
         addconst_sum += std::chrono::duration_cast<std::chrono::microseconds>(e - s).count();
     }
 
-    std::cout << "OPENFHE/CKKS/密文-密文加法 平均: " << add_sum / 10 << " us" << std::endl;
-    std::cout << "OPENFHE/CKKS/密文-明文加法 平均: " << addconst_sum / 10 << " us" << std::endl;
+    std::cout << "OPENFHE/CKKS/密文-密文加法 总耗时(us): " << add_sum << ", 执行次数:" << 1000 << ", 平均耗时(us): " << add_sum / 1000 << std::endl;
+    std::cout << "OPENFHE/CKKS/密文-明文加法 总耗时(us): " << addconst_sum << ", 执行次数:" << 1000 << ", 平均耗时(us): " << addconst_sum / 1000 << std::endl;
     return 0;
 }

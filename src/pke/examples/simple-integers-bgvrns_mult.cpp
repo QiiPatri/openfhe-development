@@ -50,15 +50,21 @@ int main() {
         auto t2 = std::chrono::high_resolution_clock::now();
         mult_sum += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
-        cMulRes = cryptoContext->EvalMult(cMul12, c3);
 
-        t1 = std::chrono::high_resolution_clock::now();
+    }
+    cMulRes = cryptoContext->EvalMult(cMul12, c3);
+    for (int i = 0; i < 2000; ++i) {
+
+
+        auto t1 = std::chrono::high_resolution_clock::now();
         cScalarMul = cryptoContext->EvalMult(c1, scalarP);
-        t2 = std::chrono::high_resolution_clock::now();
+        auto t2 = std::chrono::high_resolution_clock::now();
         scalar_mult_sum += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     }
 
-    std::cout << "OPENFHE/BGV/密文-密文乘法 平均: " << mult_sum / 100 << " us" << std::endl;
-    std::cout << "OPENFHE/BGV/密文-明文乘法 平均: " << scalar_mult_sum / 100 << " us" << std::endl;
+    // std::cout << "OPENFHE/BGV/密文-密文乘法 平均: " << mult_sum / 100 << " us" << std::endl;
+    // std::cout << "OPENFHE/BGV/密文-明文乘法 平均: " << scalar_mult_sum / 100 << " us" << std::endl;
+    std::cout << "OPENFHE/BGV/密文-密文乘法 总耗时(us): " << mult_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << mult_sum / 100 << std::endl;
+    std::cout << "OPENFHE/BGV/密文-明文乘法 总耗时(us): " << scalar_mult_sum << ", 执行次数:" << 2000 << ", 平均耗时(us): " << scalar_mult_sum / 2000 << std::endl;
     return 0;
 }
