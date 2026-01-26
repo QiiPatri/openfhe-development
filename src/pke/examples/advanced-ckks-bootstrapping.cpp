@@ -229,12 +229,12 @@ void BootstrapExample(uint32_t numSlots) {
     // We start with a depleted ciphertext that has used up all of its levels.
     Plaintext ptxt = cryptoContext->MakeCKKSPackedPlaintext(x, 1, depth - 1, nullptr, numSlots);
     ptxt->SetLength(numSlots);
-    std::cout << "Input: " << ptxt << std::endl;
+    // std::cout << "Input: " << ptxt << std::endl;
 
     // Encrypt the encoded vectors
     Ciphertext<DCRTPoly> ciph = cryptoContext->Encrypt(keyPair.publicKey, ptxt);
 
-    std::cout << "Initial number of levels remaining: " << depth - ciph->GetLevel() << std::endl;
+    // std::cout << "Initial number of levels remaining: " << depth - ciph->GetLevel() << std::endl;
 
     // Step 5: Perform the bootstrapping operation. The goal is to increase the number of levels remaining
     // for HE computation.
@@ -242,7 +242,7 @@ void BootstrapExample(uint32_t numSlots) {
     // 为自举操作添加微秒级计时
     long boot_us = 0;
     for (size_t i = 0; i < 100; i++) {
-        std::cout << "Starting bootstrapping operation..." << std::endl;
+        // std::cout << "Starting bootstrapping operation..." << std::endl;
         auto boot_start = std::chrono::high_resolution_clock::now();
         auto ciphertextAfter = cryptoContext->EvalBootstrap(ciph);
         auto boot_end = std::chrono::high_resolution_clock::now();

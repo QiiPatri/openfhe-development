@@ -44,7 +44,7 @@ int main() {
     int64_t scalar = 5;
     Plaintext scalarP = cryptoContext->MakePackedPlaintext(std::vector<int64_t>{scalar});
 
-    for (int i = 0; i < 1500; ++i) {
+    for (int i = 0; i < 100; ++i) {
         auto t1 = std::chrono::high_resolution_clock::now();
         cAdd12 = cryptoContext->EvalAdd(c1, c2);
         auto t2 = std::chrono::high_resolution_clock::now();
@@ -60,7 +60,7 @@ int main() {
 
     // std::cout << "OPENFHE/BGV/密文-密文加法 平均: " << add_sum / 1500 << " us" << std::endl;
     // std::cout << "OPENFHE/BGV/密文-明文加法 平均: " << scalar_add_sum / 1500 << " us" << std::endl;
-    std::cout << "OPENFHE/BGV/密文-密文加法 总耗时(us): " << add_sum << ", 执行次数:" << 1500 << ", 平均耗时(us): " << add_sum / 1500 << std::endl;
-    std::cout << "OPENFHE/BGV/密文-明文加法 总耗时(us): " << scalar_add_sum << ", 执行次数:" << 1500 << ", 平均耗时(us): " << scalar_add_sum / 1500 << std::endl;
+    std::cout << "OPENFHE/BGV/密文-密文加法 总耗时(us): " << add_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << add_sum / 100 << std::endl;
+    std::cout << "OPENFHE/BGV/密文-明文加法 总耗时(us): " << scalar_add_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << scalar_add_sum / 100 << std::endl;
     return 0;
 }
