@@ -29,7 +29,7 @@ int main() {
         vectorOfInts2[i] = rand() % modulus;
         vectorOfInts3[i] = rand() % modulus;
     }
-
+    std::cout<< "已加载参数logN=15，p_num=1，q_num=15"<<std::endl;
     Plaintext p1, p2, p3;
     Ciphertext<DCRTPoly> c1, c2, c3;
     p1 = cryptoContext->MakePackedPlaintext(vectorOfInts1);

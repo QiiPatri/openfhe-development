@@ -53,7 +53,7 @@ int main() {
     KeyPair<DCRTPoly> keyPair = cryptoContext->KeyGen();
     cryptoContext->EvalMultKeyGen(keyPair.secretKey);
     cryptoContext->EvalRotateKeyGen(keyPair.secretKey, {1,2,-1,-2});
-
+    std::cout<< "已加载参数logN=15，p_num=1，q_num=15"<<std::endl;
     int64_t scalar = 2;
     size_t vecLen = 32768;
     int64_t modulus = 0xC0001;

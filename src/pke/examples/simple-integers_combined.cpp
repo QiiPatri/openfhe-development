@@ -54,7 +54,7 @@ int main() {
     // 参数信息（略）
     const auto cryptoParams  = std::dynamic_pointer_cast<CryptoParametersRNS>(cryptoContext->GetCryptoParameters());
     const auto elementParams = cryptoParams->GetElementParams();
-
+    std::cout<< "已加载参数logN=15，p_num=1，q_num=15"<<std::endl;
     std::cout << "BFV scheme is using ring dimension " << cryptoContext->GetRingDimension() << std::endl;
 
     // KeyGen

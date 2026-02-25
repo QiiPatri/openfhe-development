@@ -21,6 +21,7 @@ int main() {
     cc->Enable(KEYSWITCH);
     cc->Enable(LEVELEDSHE);
 
+    std::cout<< "已加载参数logN=16，p_num=6，q_num=24"<<std::endl;
     auto keys = cc->KeyGen();
     cc->EvalMultKeyGen(keys.secretKey);
     cc->EvalRotateKeyGen(keys.secretKey, {1, -2});

@@ -146,25 +146,25 @@ void BootstrapExample(uint32_t numSlots) {
     cryptoContext->Enable(FHE);
 
     usint ringDim = cryptoContext->GetRingDimension();
-    std::cout << "CKKS scheme is using ring dimension " << ringDim << std::endl << std::endl;
+    // std::cout << "CKKS scheme is using ring dimension " << ringDim << std::endl << std::endl;
 
     // 获取加密参数信息
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(cryptoContext->GetCryptoParameters());
     const auto elementParams = cryptoParams->GetElementParams();
     
     // 打印环维度
-    std::cout << "CKKS scheme is using ring dimension " << cryptoContext->GetRingDimension() << std::endl;
+    std::cout << "已加载参数logN=" << log2(ringDim);
     
     // 打印模数链长度（q的个数）
     size_t numQ = elementParams->GetParams().size();
-    std::cout << "Number of moduli in ciphertext modulus chain (q): " << numQ << std::endl;
     
-    // 打印所有q值
-    std::cout << "Moduli q values: " << std::endl;
-    for (size_t i = 0; i < numQ; i++) {
-        auto params = elementParams->GetParams();
-        std::cout << "q[" << i << "]: " << params[i]->GetModulus() << std::endl;
-    }
+    
+    // // 打印所有q值
+    // std::cout << "Moduli q values: " << std::endl;
+    // for (size_t i = 0; i < numQ; i++) {
+    //     auto params = elementParams->GetParams();
+    //     std::cout << "q[" << i << "]: " << params[i]->GetModulus() << std::endl;
+    // }
     
     // 尝试获取和打印所有p值
     try {
@@ -172,31 +172,31 @@ void BootstrapExample(uint32_t numSlots) {
         const auto paramsP = cryptoParams->GetParamsP();
         if (paramsP != nullptr) {
             size_t numP = paramsP->GetParams().size();
-            std::cout << "\nNumber of special primes (p): " << numP << std::endl;
-            
-            // 打印所有p值
-            std::cout << "Special primes p values: " << std::endl;
-            for (size_t i = 0; i < numP; i++) {
-                auto paramP = paramsP->GetParams();
-                std::cout << "p[" << i << "]: " << paramP[i]->GetModulus() << std::endl;
-            }
+            std::cout << "，p_num=" << numP;
+            std::cout << "，q_num=" << numQ << std::endl;
+            // // 打印所有p值
+            // std::cout << "Special primes p values: " << std::endl;
+            // for (size_t i = 0; i < numP; i++) {
+            //     auto paramP = paramsP->GetParams();
+            //     std::cout << "p[" << i << "]: " << paramP[i]->GetModulus() << std::endl;
+            // }
         } else {
             std::cout << "\nNo special primes (p) are used in current configuration." << std::endl;
         }
         
-        // 打印辅助信息
-        std::cout << "\nKey switching technique: ";
-        switch (cryptoParams->GetKeySwitchTechnique()) {
-            case BV:
-                std::cout << "BV (no special primes)" << std::endl;
-                break;
-            case HYBRID:
-                std::cout << "HYBRID with " << cryptoParams->GetNumberOfQPartitions() << " partitions" << std::endl;
-                std::cout << "Alpha (towers per digit): " << cryptoParams->GetNumPerPartQ() << std::endl;
-                break;
-            default:
-                std::cout << "Unknown" << std::endl;
-        }
+        // // 打印辅助信息
+        // std::cout << "\nKey switching technique: ";
+        // switch (cryptoParams->GetKeySwitchTechnique()) {
+        //     case BV:
+        //         std::cout << "BV (no special primes)" << std::endl;
+        //         break;
+        //     case HYBRID:
+        //         std::cout << "HYBRID with " << cryptoParams->GetNumberOfQPartitions() << " partitions" << std::endl;
+        //         std::cout << "Alpha (towers per digit): " << cryptoParams->GetNumPerPartQ() << std::endl;
+        //         break;
+        //     default:
+        //         std::cout << "Unknown" << std::endl;
+        // }
     } catch (const std::exception& e) {
         std::cout << "\nCould not determine special primes: " << e.what() << std::endl;
     }
