@@ -81,14 +81,14 @@ int main() {
     
     Plaintext scalarPlaintext = cryptoContext->MakePackedPlaintext(vectorOfInts4);
 
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10; ++i) {
         auto t1 = std::chrono::high_resolution_clock::now();
         ciphertextMul12 = cryptoContext->EvalMult(ciphertext1, ciphertext2);
         auto t2 = std::chrono::high_resolution_clock::now();
         mult_sum += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     }
     ciphertextMultResult = cryptoContext->EvalMult(ciphertextMul12, ciphertext3);
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10; ++i) {
 
 
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -97,10 +97,10 @@ int main() {
         scalar_mult_sum += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
     }
 
-    // std::cout << "OPENFHE/BFV/密文-密文乘法 平均: " << mult_sum / 100 << " us" << std::endl;
-    // std::cout << "OPENFHE/BFV/密文-明文乘法 平均: " << scalar_mult_sum / 100 << " us" << std::endl;
-    std::cout << "OPENFHE/BFV/密文-密文乘法 总耗时(us): " << mult_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << mult_sum / 100 << std::endl;
-    std::cout << "OPENFHE/BFV/密文-明文乘法 总耗时(us): " << scalar_mult_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << scalar_mult_sum / 100 << std::endl;
+    // std::cout << "OPENFHE/BFV/密文-密文乘法 平均: " << mult_sum / 10 << " us" << std::endl;
+    // std::cout << "OPENFHE/BFV/密文-明文乘法 平均: " << scalar_mult_sum / 10 << " us" << std::endl;
+    std::cout << "OPENFHE/BFV/密文-密文乘法 总耗时(us): " << mult_sum << ", 执行次数:" << 10 << ", 平均耗时(us): " << mult_sum / 10 << std::endl;
+    std::cout << "OPENFHE/BFV/密文-明文乘法 总耗时(us): " << scalar_mult_sum << ", 执行次数:" << 10 << ", 平均耗时(us): " << scalar_mult_sum / 10 << std::endl;
 
     return 0;
 }

@@ -76,7 +76,7 @@ int main() {
     uint64_t encode_sum = 0;
     Plaintext plaintext1, plaintext2, plaintext3;
     Ciphertext<DCRTPoly> ciphertext1, ciphertext2, ciphertext3;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10; ++i) {
         auto t1 = std::chrono::high_resolution_clock::now();
         plaintext1 = cryptoContext->MakePackedPlaintext(vectorOfInts1);
         ciphertext1 = cryptoContext->Encrypt(keyPair.publicKey, plaintext1);
@@ -97,7 +97,7 @@ int main() {
     }
 
     // std::cout << "OPENFHE/BFV/加密 平均: " << encode_sum / 300 << " us" << std::endl;
-    std::cout << "OPENFHE/BFV/加密 总耗时(us): " << encode_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << encode_sum / 100 << std::endl;
+    std::cout << "OPENFHE/BFV/加密 总耗时(us): " << encode_sum << ", 执行次数:" << 10 << ", 平均耗时(us): " << encode_sum / 10 << std::endl;
 
     // 执行若干操作以得到待解密的 ciphertexts
     auto ciphertextAdd12 = cryptoContext->EvalAdd(ciphertext1, ciphertext2);
@@ -113,7 +113,7 @@ int main() {
     // 解密 + 解码 计时（合并）：对上面 6 个结果做 10 次解密计时
     uint64_t dec_sum = 0;
     Plaintext ptAddResult, ptMultResult, ptRot1, ptRot2, ptRot3, ptRot4;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10; ++i) {
         auto d1 = std::chrono::high_resolution_clock::now();
         cryptoContext->Decrypt(keyPair.secretKey, ciphertextAddResult, &ptAddResult);
         auto d2 = std::chrono::high_resolution_clock::now();
@@ -126,8 +126,8 @@ int main() {
 
     }
 
-    // std::cout << "OPENFHE/BFV/解密 平均: " << dec_sum / 100 << " us" << std::endl;
-    std::cout << "OPENFHE/BFV/解密 总耗时(us): " << dec_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << dec_sum / 100 << std::endl;
+    // std::cout << "OPENFHE/BFV/解密 平均: " << dec_sum / 10 << " us" << std::endl;
+    std::cout << "OPENFHE/BFV/解密 总耗时(us): " << dec_sum << ", 执行次数:" << 10 << ", 平均耗时(us): " << dec_sum / 10 << std::endl;
 
     return 0;
 }

@@ -32,7 +32,7 @@ int main() {
 
     uint64_t encode_sum = 0;
     Plaintext p1, p2;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10; ++i) {
         auto s = std::chrono::high_resolution_clock::now();
         p1 = cc->MakeCKKSPackedPlaintext(x1);
         auto e = std::chrono::high_resolution_clock::now();
@@ -48,7 +48,7 @@ int main() {
 
     }
     // std::cout << "OPENFHE/CKKS/加密 平均: " << encode_sum / 100  << " us" << std::endl;
-    std::cout << "OPENFHE/CKKS/加密 总耗时(us): " << encode_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << encode_sum / 100 << std::endl;
+    std::cout << "OPENFHE/CKKS/加密 总耗时(us): " << encode_sum << ", 执行次数:" << 10 << ", 平均耗时(us): " << encode_sum / 10 << std::endl;
 
     // Encrypt to produce ciphertexts
     Ciphertext<DCRTPoly> c1 = cc->Encrypt(keys.publicKey, p1);
@@ -60,13 +60,13 @@ int main() {
 
     uint64_t dec_sum = 0;
     Plaintext res;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10; ++i) {
         auto d1 = std::chrono::high_resolution_clock::now();
         cc->Decrypt(keys.secretKey, cAdd, &res);
         auto d2 = std::chrono::high_resolution_clock::now();
         dec_sum += std::chrono::duration_cast<std::chrono::microseconds>(d2 - d1).count();
     }
-    // std::cout << "OPENFHE/CKKS/解密 平均: " << dec_sum / 100 << " us" << std::endl;
-    std::cout << "OPENFHE/CKKS/解密 总耗时(us): " << dec_sum << ", 执行次数:" << 100 << ", 平均耗时(us): " << dec_sum / 100 << std::endl;
+    // std::cout << "OPENFHE/CKKS/解密 平均: " << dec_sum / 10 << " us" << std::endl;
+    std::cout << "OPENFHE/CKKS/解密 总耗时(us): " << dec_sum << ", 执行次数:" << 10 << ", 平均耗时(us): " << dec_sum / 10 << std::endl;
     return 0;
 }
